@@ -2186,6 +2186,16 @@ async function haandterFiler(filer) {
     try {
       const tekst = await laesFil(file);
       samletTekst += '\n\n===== ' + file.name + ' =====\n' + tekst;
+      const rentTegn = String(tekst).replace(/\s/g, '').length;
+      if (rentTegn < 200) {
+        // typisk en scanning eller et billede: pdf'en har intet tekstlag
+        linje.innerHTML = '<span class="text-amber-400">!</span> ' + esc(file.name) +
+          '<div class="text-[11px] text-amber-300 ml-6">Der kunne ikke læses tekst ud af filen. ' +
+          'Den er sandsynligvis scannet ind som billede, og så er der intet at søge i. ' +
+          'Kopiér teksten fra filen ind i feltet nedenfor, eller skriv tallene ind i hånden på fanen Beregning.</div>';
+        linje.className = 'flex items-start gap-2 text-slate-300 flex-wrap';
+        continue;
+      }
       const nye = tilfoejFund(findVaerdier(tekst), file.name);
       const stor = tekst.length > 300000;
       linje.innerHTML = '<span class="text-emerald-400">✔</span> ' + esc(file.name) +
@@ -2193,7 +2203,9 @@ async function haandterFiler(filer) {
         (stor ? '<div class="text-[11px] text-amber-300 ml-6">Meget stor fil. Det ligner en bog eller et kompendium frem for en case. Upload helst kun selve casen og dens bilag, ellers drukner de rigtige tal i støj.</div>' : '');
       linje.className = 'flex items-start gap-2 text-slate-300 flex-wrap';
     } catch (e) {
-      linje.innerHTML = '<span class="text-red-400">✕</span> ' + esc(file.name) + ' <span class="text-xs text-red-300">kunne ikke læses: ' + esc(e.message) + '</span>';
+      const tom = /empty|data length = 0|zero bytes/i.test(String(e.message));
+      linje.innerHTML = '<span class="text-red-400">✕</span> ' + esc(file.name) + ' <span class="text-xs text-red-300">' +
+        (tom ? 'filen er tom' : 'kunne ikke læses: ' + esc(e.message)) + '</span>';
     }
   }
   $('#tekstDump').textContent = samletTekst.slice(0, 60000);
