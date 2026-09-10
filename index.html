@@ -763,6 +763,7 @@ function tegnResultat() {
 
   tegnVurdering(r);
   tegnFormler(r);
+  if (scenarierForCase().length < 2) tegnKonklusion(scenarierForCase());
 }
 
 function kpi(label, vaerdi, note) {
@@ -930,7 +931,7 @@ function tegnSammenlign() {
   if (!arr.length) {
     $('#sammenlignBoks').innerHTML = '<div class="text-sm text-slate-400">Ingen muligheder gemt endnu. Lav en beregning og tryk "Gem som mulighed".</div>';
     $('#pointBoks').innerHTML = '';
-    if ($('#konklusion')) $('#konklusion').innerHTML = '<div class="text-sm text-slate-400">Gem mindst to muligheder, så skrives konklusionen her.</div>';
+    tegnKonklusion([]);
     return;
   }
   const minPris = Math.min.apply(null, arr.map(a => a.total));
@@ -1215,11 +1216,106 @@ function casecitat(prosa) {
   return point > 0 ? bedst : (saetninger[0] || '');
 }
 
+// Der skal staa noget brugbart, ogsaa naar der ikke er tal nok til en beregning.
+function ingenBeregningEndnu() {
+  if (!samletTekst.trim() && !fund.length) {
+    return '<div class="border border-[#1e2836] rounded-xl p-3 text-sm text-slate-300">' +
+      'Der er ikke lagt en case ind endnu. Upload casen på fanen Case og bilag, eller skriv tallene ind på fanen Beregning. ' +
+      'Så skrives konklusionen her af sig selv.</div>';
+  }
+  const har = t => fund.some(f => f.type === t);
+  const mangler = [];
+  if (!(har('tiers') || har('wmFragt') || har('fastFragt'))) mangler.push('selve fragtprisen, som sættes under punkt C');
+  if (!(har('kolli') || har('volumen') || har('maengde') || har('container'))) mangler.push('rumfanget eller målene på kollierne under punkt A');
+  if (!har('vaegt')) mangler.push('vægten under punkt A');
+  return '<div class="border border-amber-800 bg-amber-950/20 rounded-xl p-3 text-sm text-slate-300">' +
+    'Casen er lagt ind, men der er endnu ikke nok til en beregning' +
+    (mangler.length ? ', fordi der mangler ' + esc(mangler.join(', ')) : '') + '. ' +
+    'Casen indeholder ' + fund.length + ' fundne værdier. Sæt dem ind på fanen Case og bilag, udfyld resten i hånden, ' +
+    'og konklusionen skrives her.' +
+    '</div><div class="border border-[#1e2836] rounded-xl p-3 text-sm text-slate-300 mt-2">' +
+    'Er der ingen fragtsatser i casen, er den ikke en regneopgave. Så ligger svaret i teksten, ikke i tallene, ' +
+    'og fanen Teori kan bruges til at strukturere din vurdering af transportform, ansvar og leveringsbetingelse.</div>';
+}
+
+// Konklusion naar der kun er regnet paa én loesning. Der er ikke noget at
+// sammenligne med, saa der skrives i stedet, hvad tallene selv fortaeller.
+function enkeltKonklusion(r, navn) {
+  const s = state;
+  const k = [];
+  const prKgFaktisk = r.faktiskVaegt > 0 ? r.total / (r.faktiskVaegt * r.antal) : 0;
+  const prM3 = r.volumen > 0 ? r.total / (r.volumen * r.antal) : 0;
+  const vaerdiPrKg = r.faktiskVaegt > 0 ? num(s.vareVaerdi) / r.faktiskVaegt : 0;
+
+  k.push({ type: 'ok', txt: navn + ' koster ' + fmt(r.total) + ' DKK i alt' +
+    (r.antal > 1 ? ', altså ' + fmt(r.total / r.antal) + ' DKK pr. forsendelse' : '') +
+    '. Der afregnes for ' + fmt(r.fragtpligtig) + ' kg fragtpligtig vægt' +
+    (r.volumen > 0 ? ' og ' + fmt(r.volumen, 3) + ' m³' : '') + '.' });
+
+  if (prKgFaktisk > 0) {
+    k.push({ type: 'info', txt: 'Det svarer til ' + fmt(prKgFaktisk) + ' DKK pr. kg gods' +
+      (prM3 > 0 ? ' og ' + fmt(prM3) + ' DKK pr. m³' : '') + '. Brug det tal, når du sammenligner med et andet tilbud, i stedet for fragtraten alene.' });
+  }
+
+  if (r.volumenVaegt > r.faktiskVaegt && r.faktiskVaegt > 0) {
+    k.push({ type: 'advarsel', txt: 'Prisen styres af rumfanget, ikke af vægten. Der betales for ' +
+      fmt(r.volumenVaegt - r.faktiskVaegt) + ' kg luft. Bedre pakning eller stabling flytter derfor mere end en forhandling om fragtraten.' });
+  } else if (r.faktiskVaegt > 0 && r.volumen > 0) {
+    k.push({ type: 'info', txt: 'Prisen styres af vægten. Godset er tungt i forhold til sin plads, så bedre pakning sænker ikke fragten nævneværdigt.' });
+  }
+
+  if (s.fragtType === 'trappe' && r.valgt && !r.valgt.egen) {
+    const egen = r.kandidater.find(x => x.egen);
+    k.push({ type: 'ok', txt: 'Der er udnyttet et break-point: der deklareres ' + fmt(r.valgt.vaegt) + ' kg i stedet for ' +
+      fmt(r.fragtpligtig) + ' kg' + (egen ? ', hvilket sparer ' + fmt(egen.belob - r.valgt.belob) + ' ' + s.valutaFragt : '') +
+      '. Skriv den begrundelse ind, ellers ser det ud som en regnefejl.' });
+  }
+
+  const tillaegAndel = r.total > 0 ? r.tillaegDKK / r.total * 100 : 0;
+  if (tillaegAndel > 30) {
+    k.push({ type: 'info', txt: 'Tillæg og gebyrer udgør ' + fmt(tillaegAndel, 0) + ' % af regningen. Selve fragtraten er altså kun ' +
+      fmt(100 - tillaegAndel, 0) + ' % af det, du betaler.' });
+  }
+
+  if (r.vareVaerdi > 0) {
+    k.push({ type: 'info', txt: 'Fragten svarer til ' + fmt(r.total / r.vareVaerdi * 100, 1) + ' % af varens værdi' +
+      (vaerdiPrKg > 0 ? ', og værdien er ' + fmt(vaerdiPrKg) + ' DKK pr. kg' : '') + '.' +
+      (s.mode === 'luft' && vaerdiPrKg > 0 && vaerdiPrKg < 100 ? ' Det er lavt for luftfragt, så hastigheden skal have en selvstændig værdi, før det kan forsvares.' : '') });
+  } else {
+    k.push({ type: 'advarsel', txt: 'Vareværdien er ikke udfyldt, så fragtraten, forsikringen og kapitalbindingen kan ikke beregnes. Udfyld den under punkt A, hvis casen oplyser den.' });
+  }
+
+  if (!(s.linjer || []).some(l => l.aktiv && /forsikring|insurance/i.test(l.navn))) {
+    k.push({ type: 'advarsel', txt: 'Der er ingen forsikringspost. Præmien beregnes normalt af varens værdi plus fragten, og transportørens eget ansvar er beløbsbegrænset. Tag stilling til den, også hvis du vælger den fra.' });
+  }
+
+  k.push({ type: 'info', txt: 'Der er kun regnet på én løsning. En konklusion står stærkere, hvis den holdes op mod et alternativ. Lav en beregning mere, fx en anden transportform eller et andet tilbud, tryk Gem som mulighed på begge, så skrives sammenligningen her.' });
+
+  const farve = { ok: 'border-emerald-800 bg-emerald-950/20', advarsel: 'border-amber-800 bg-amber-950/20', info: 'border-[#1e2836]' };
+  let h = k.map(x => '<div class="border rounded-xl p-3 text-sm text-slate-300 ' + farve[x.type] + '">' + esc(x.txt) + '</div>').join('');
+
+  const citat = casecitat(samletTekst);
+  if (citat) {
+    h += '<div class="border border-[#1e2836] rounded-xl p-3 mt-2">' +
+      '<div class="text-xs text-slate-400 mb-1">Fra casens egen tekst:</div>' +
+      '<div class="text-sm text-slate-300 italic">&laquo;' + esc(citat) + '&raquo;</div></div>';
+  }
+  return h;
+}
+
 function tegnKonklusion(arr) {
   const boks = $('#konklusion');
   if (!boks) return;
   if (arr.length < 2) {
-    boks.innerHTML = '<div class="text-sm text-slate-400">Gem mindst to muligheder, så skrives konklusionen her.</div>';
+    const enkelt = arr.length === 1 ? arr[0] : null;
+    const gemtState = state;
+    if (enkelt) state = JSON.parse(JSON.stringify(enkelt.state));
+    const r = beregn();
+    const navn = enkelt ? enkelt.navn : (state.caseNavn || 'Beregningen');
+    const harIndhold = r.total > 0 || r.fragtpligtig > 0;
+    const h = harIndhold ? enkeltKonklusion(r, navn) : '';
+    state = gemtState;
+    boks.innerHTML = h || ingenBeregningEndnu();
     return;
   }
   const kort = navn => String(navn).length > 46 ? String(navn).slice(0, 44).trim() + '…' : String(navn);
@@ -1288,6 +1384,33 @@ function tegnKonklusion(arr) {
 
   const farve = { ok: 'border-emerald-800 bg-emerald-950/20', advarsel: 'border-amber-800 bg-amber-950/20', info: 'border-[#1e2836]' };
   let h = saetninger.map(x => '<div class="border rounded-xl p-3 text-sm text-slate-300 ' + farve[x.type] + '">' + esc(x.txt) + '</div>').join('');
+
+  // Naerbillede af den anbefalede loesning
+  const gemtState = state;
+  state = JSON.parse(JSON.stringify(billigst.state));
+  const rb = beregn();
+  const naer = [];
+  if (rb.volumenVaegt > rb.faktiskVaegt && rb.faktiskVaegt > 0) {
+    naer.push('Prisen styres af rumfanget, ikke af vægten. Der betales for ' + fmt(rb.volumenVaegt - rb.faktiskVaegt) +
+      ' kg luft, så bedre pakning flytter mere end en forhandling om raten.');
+  } else if (rb.faktiskVaegt > 0 && rb.volumen > 0) {
+    naer.push('Prisen styres af vægten. Godset er tungt i forhold til sin plads, så bedre pakning sænker ikke fragten nævneværdigt.');
+  }
+  if (state.fragtType === 'trappe' && rb.valgt && !rb.valgt.egen) {
+    const egen = rb.kandidater.find(x => x.egen);
+    naer.push('Der er udnyttet et break-point: der deklareres ' + fmt(rb.valgt.vaegt) + ' kg i stedet for ' + fmt(rb.fragtpligtig) +
+      ' kg' + (egen ? ', hvilket sparer ' + fmt(egen.belob - rb.valgt.belob) + ' ' + state.valutaFragt : '') + '. Husk at begrunde det.');
+  }
+  const andel = rb.total > 0 ? rb.tillaegDKK / rb.total * 100 : 0;
+  if (andel > 30) naer.push('Tillæg og gebyrer udgør ' + fmt(andel, 0) + ' % af regningen, så selve fragtraten er kun ' + fmt(100 - andel, 0) + ' % af det, der betales.');
+  if (rb.faktiskVaegt > 0) naer.push('Prisen svarer til ' + fmt(rb.total / (rb.faktiskVaegt * rb.antal)) + ' DKK pr. kg gods.');
+  state = gemtState;
+  if (naer.length) {
+    h += '<div class="border border-[#1e2836] rounded-xl p-3 mt-2">' +
+      '<div class="text-xs text-slate-400 mb-2">Om den anbefalede løsning, ' + esc(kort(billigst.navn)) + ':</div>' +
+      '<ul class="text-sm text-slate-300 list-disc pl-5 space-y-1">' +
+      naer.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>';
+  }
 
   const medCitat = arr.filter(x => casecitat(x.prosa));
   if (medCitat.length) {
