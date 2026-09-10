@@ -102,6 +102,7 @@
       <label class="text-sm text-slate-400">Antal forsendelser</label>
       <input id="antalForsendelser" class="num w-20" value="1">
     </div>
+    <div id="muligheder" class="mt-3"></div>
   </div>
 
   <!-- 1. Forsendelsen -->
@@ -833,6 +834,15 @@ function tegnVurdering(r) {
   if (state.mode === 'bane' || state.mode === 'vejEU') {
     add('advarsel', 'Bemærk faktoren. Kompendiet angiver både 1 ton = 3,33 m³ og 1 m³ = 333,3 kg for denne transportform, og de to udsagn strider mod hinanden. Her er brugt ' + fmt(num(state.faktor), 2) + ' kg pr. m³. Bruger din underviser 1 ton = 3,33 m³, skal faktoren sættes til 300. Skriv din forudsætning ind i besvarelsen.');
   }
+
+  // Et procenttillaeg sammen med et fradrag: regnes procenten foer eller efter fradraget?
+  const fradrag = state.linjer.filter(l => l.aktiv && l.type !== 'pct' && num(l.sats) < 0);
+  const procenter = state.linjer.filter(l => l.aktiv && l.type === 'pct');
+  if (fradrag.length && procenter.length) {
+    add('advarsel', 'Der er både et fradrag (' + fradrag.map(l => l.navn || 'uden navn').join(', ') +
+      ') og et procenttillæg i beregningen. Så betyder rækkefølgen noget: regnes procenten af beløbet før eller efter fradraget? Casen siger det sjældent. Vælg selv, sæt fluebenene i procentlinjen derefter, og skriv din antagelse ind i besvarelsen.');
+  }
+
   add('info', 'Husk leveringsbetingelsen. Incoterms afgør hvem der betaler og bærer risikoen på hver strækning, og dermed hvilke af posterne ovenfor der overhovedet er dine.');
 
   const farve = { ok: 'border-emerald-800 bg-emerald-950/20', advarsel: 'border-amber-800 bg-amber-950/20', info: 'border-[#1e2836]' };
@@ -958,6 +968,28 @@ function tegnPoint(arr) {
   $('#pointBoks').innerHTML = h;
 }
 
+
+
+// Casen kan have flere transportmuligheder. Her skiftes mellem dem uden
+// at gaa via fanen Sammenlign.
+function tegnMuligheder() {
+  const boks = $('#muligheder');
+  if (!boks) return;
+  const arr = hentScenarier();
+  if (arr.length < 2) { boks.innerHTML = ''; return; }
+  const mindst = Math.min.apply(null, arr.map(x => x.total));
+  boks.innerHTML = '<div class="text-xs text-slate-400 mb-2">Der er ' + arr.length +
+    ' beregnede muligheder. Klik for at se udregningen for hver enkelt.</div><div class="flex flex-wrap gap-2">' +
+    arr.map((x, i) => {
+      const aktiv = x.navn === state.caseNavn;
+      const billigst = Math.abs(x.total - mindst) < 0.005;
+      return '<button class="mulighedKnap text-left px-3 py-1.5 rounded-lg border text-xs ' +
+        (aktiv ? 'border-blue-500 bg-blue-950/40 text-white' : 'border-[#2b3542] hover:border-slate-500 text-slate-300') +
+        '" data-i="' + i + '"><div class="font-medium">' + esc(x.navn) +
+        (billigst ? ' <span class="text-emerald-400">billigst</span>' : '') + '</div>' +
+        '<div class="text-[11px] text-slate-400">' + fmt(x.total) + ' DKK</div></button>';
+    }).join('') + '</div>';
+}
 
 // ============================================================
 //  Udregningen trin for trin
@@ -1112,6 +1144,24 @@ function tegnKonklusion(arr) {
   } else {
     saetninger.push({ type: 'info', txt: 'Alle muligheder har forsikring med. Da præmien følger varens værdi plus fragten, vokser den i takt med fragtprisen, og den billigste transport er derfor også den billigst forsikrede.' });
   }
+
+  // Udnyttelse: en container koeber du plads i, ikke gods. Passer godset overhovedet?
+  const faktiskeMaengder = arr.filter(x => !x.erKapacitet && num(x.volumen) > 0).map(x => num(x.volumen));
+  const gods = faktiskeMaengder.length ? Math.max.apply(null, faktiskeMaengder) : 0;
+  const kapaciteter = arr.filter(x => x.erKapacitet && num(x.volumen) > 0);
+  if (gods > 0 && kapaciteter.length) {
+    kapaciteter.forEach(x => {
+      const u = gods / num(x.volumen);
+      if (u > 0.85) {
+        saetninger.push({ type: 'advarsel', txt: kort(x.navn) + ' har ' + fmt(num(x.volumen), 0) + ' m³ kapacitet, og casen sender ca. ' +
+          fmt(gods, 0) + ' m³. Det er ' + fmt(u * 100, 0) + ' % udnyttelse, altså helt op til kanten. Uregelmæssigt gods som møbler stables sjældent tættere end 75 til 85 procent, så tjek om det overhovedet kan være i containeren, før du vælger den.' });
+      } else if (u < 0.6) {
+        saetninger.push({ type: 'info', txt: kort(x.navn) + ' har ' + fmt(num(x.volumen), 0) + ' m³ kapacitet, men der sendes kun ca. ' +
+          fmt(gods, 0) + ' m³, altså ' + fmt(u * 100, 0) + ' % udnyttelse. Du betaler for tom plads. Det giver kun mening, hvis mængden forventes at vokse.' });
+      }
+    });
+  }
+
   const citatBilligst = casecitat(billigst.prosa);
   const forbehold = /no guarantee|ingen garanti|prolonged|forl(?:æ|ae)nget|delay|forsink|vary|varier/i.test(citatBilligst);
   saetninger.push({ type: 'ok', txt: 'Anbefaling: vælg ' + kort(billigst.navn) + ', som er billigst med ' + fmt(billigst.total) + ' DKK. ' +
@@ -1168,6 +1218,7 @@ function fyldFormular() {
   tegnValutaer();
   visFragtBoks();
   tegnAlt();
+  tegnMuligheder();
 }
 
 function visInputType() {
@@ -1445,9 +1496,9 @@ function findMaengdeListe(tekst, afsnit) {
       const gentag = l.match(/(\d{1,3})\s*(?:monthly|m(?:å|aa)nedlige|ugentlige|weekly|)\s*(?:transports?|forsendelser|shipments?|afgange?)/i);
       if (c) {
         const antalC = c[1] ? parseInt(c[1], 10) : 1;
-        return { m3: antalC * (CONTAINER_M3[c[2]] || 33), antalKolli: antalC, gentag: gentag ? parseInt(gentag[1], 10) : 1, tekst: l };
+        return { m3: antalC * (CONTAINER_M3[c[2]] || 33), erKapacitet: true, antalKolli: antalC, gentag: gentag ? parseInt(gentag[1], 10) : 1, tekst: l };
       }
-      return { m3: num(v[1]), antalKolli: 0, gentag: gentag ? parseInt(gentag[1], 10) : 1, tekst: l };
+      return { m3: num(v[1]), erKapacitet: false, antalKolli: 0, gentag: gentag ? parseInt(gentag[1], 10) : 1, tekst: l };
     });
     if (maengder.some(x => !x)) return;
     maengder.forEach((mg, i) => ud.push({ afsnit: afsnit[i].nr, maengde: mg, pos: start }));
@@ -1859,8 +1910,9 @@ function byggStateFraFund(valgte, navn, grund) {
     s.antalKolliDirekte = mg.data.antalKolli;
     if (mg.data.gentag > 1) s.antalForsendelser = mg.data.gentag;
   }
+  s.volumenErKapacitet = !!(mg && mg.data.erKapacitet);
   const cont = valgte.find(f => f.type === 'container');
-  if (cont && !kolli.length && !mg) { s.inputType = 'direkte'; s.volumenDirekte = cont.data.m3; s.antalKolliDirekte = cont.data.antal; }
+  if (cont && !kolli.length && !mg) { s.inputType = 'direkte'; s.volumenDirekte = cont.data.m3; s.antalKolliDirekte = cont.data.antal; s.volumenErKapacitet = true; }
   const vol = valgte.filter(f => f.type === 'volumen');
   if (vol.length && !kolli.length && !mg && !cont) { s.inputType = 'direkte'; s.volumenDirekte = vol[0].data.volumen; }
 
@@ -1962,6 +2014,7 @@ function indsaetFund() {
       arr.push({ navn: a.navn, beskrivelse: a.beskrivelse || '', mode: MODES[st.mode].navn, vaegt: r.fragtpligtig, total: r.total,
         kapital: r.kapitalbinding, tid: num(st.transportTid), frekvens: num(st.frekvens),
         paalidelighed: num(st.paalidelighed), co2: r.co2, volumen: r.volumen * r.antal,
+        erKapacitet: !!st.volumenErKapacitet,
         prosa: a.prosa || '', state: JSON.parse(JSON.stringify(st)) });
       state = gemtState;
     });
@@ -2057,6 +2110,17 @@ function bind() {
     fyldFormular();
   });
 
+  $('#muligheder').addEventListener('click', e => {
+    const b = e.target.closest('.mulighedKnap');
+    if (!b) return;
+    const arr = hentScenarier();
+    const valgt = arr[+b.dataset.i];
+    if (!valgt) return;
+    state = JSON.parse(JSON.stringify(valgt.state));
+    fyldFormular();
+    try { $('#resultat').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (err) {}
+  });
+
   $('#beregnKnap').addEventListener('click', () => {
     tegnResultat();
     const b = $('#beregnKnap'), t = b.textContent; b.textContent = 'Beregnet ✔';
@@ -2137,7 +2201,8 @@ function bind() {
     const r = beregn(), arr = hentScenarier();
     arr.push({ navn: state.caseNavn || 'Uden navn', mode: MODES[state.mode].navn, vaegt: r.fragtpligtig, total: r.total,
       kapital: r.kapitalbinding, tid: num(state.transportTid), frekvens: num(state.frekvens),
-      paalidelighed: num(state.paalidelighed), co2: r.co2, state: JSON.parse(JSON.stringify(state)) });
+      paalidelighed: num(state.paalidelighed), co2: r.co2, volumen: r.volumen * r.antal,
+      erKapacitet: !!state.volumenErKapacitet, prosa: state.prosa || '', state: JSON.parse(JSON.stringify(state)) });
     gemScenarier(arr); tegnSammenlign();
     const b = $('#gemScenarie'), t = b.textContent; b.textContent = 'Gemt ✔';
     setTimeout(() => { b.textContent = t; }, 1200);
