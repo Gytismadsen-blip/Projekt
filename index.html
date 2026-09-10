@@ -52,6 +52,7 @@
       Læg casen og eventuelle bilag ind. Siden læser teksten og finder tallene med faste søgemønstre.
       <span class="text-amber-300">Der bruges ingen AI</span> og intet sendes ud af din computer. Du godkender selv hver værdi, før den sættes ind.
       Understøtter PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), .txt og .csv.
+      Skal en case og dens beregninger kunne hentes frem en anden dag, så tryk Gem case. Ellers starter siden tom hver gang.
     </p>
     <div id="drop" class="drop border-2 border-dashed border-[#2b3542] rounded-xl p-6 text-center cursor-pointer hover:border-slate-500 transition">
       <div class="text-sm text-slate-300 font-medium">Træk filer herind eller klik for at vælge</div>
@@ -2361,9 +2362,8 @@ function caseNavnFraFiler() {
 
 // Kun de muligheder der hoerer til den aktuelle case
 function scenarierForCase() {
-  const alle = hentScenarier();
-  if (!aktivCase) return alle.filter(x => !x.case);
-  return alle.filter(x => (x.case || '') === aktivCase);
+  if (!aktivCase) return [];
+  return hentScenarier().filter(x => (x.case || '') === aktivCase);
 }
 
 function gaaTilFane(navn) {
@@ -2706,6 +2706,10 @@ tegnGemteCases();
 window.addEventListener('pageshow', () => {
   fyldFormular();
 });
+
+// Beregnede muligheder hoerer til den case, man havde aabent. Ved opstart er
+// der ingen case, saa de ryddes. Vil man beholde dem, gemmes casen med Gem case.
+gemScenarier([]);
 
 // Start med en tom beregning.
 state = tomState();
