@@ -1,4 +1,4 @@
-# Fragtkalkulator
+# Fragtberegner
 
 Værktøj til transportøkonomi: fragtpligtig vægt, transportpris og totalomkostning for luft-, sø-, bane- og vejfragt.
 Bygget til faget Distribution på logistikøkonomuddannelsen, men lavet så det kan bruges på en hvilken som helst case.
@@ -47,6 +47,20 @@ leveringssikkerhed og CO2. Vægtet pointmodel hvor man selv sætter kriteriernes
 
 **Teori**
 w/m-faktorer, break-point, ordbog over tillæg, kriterier for valg af transportform og CO2-faktorer.
+
+## Kontrolberegninger med kendt facit
+
+Siden testes automatisk mod rigtige casefiler. Resultaterne skal ramme præcis disse tal:
+
+| Case | Resultat |
+|---|---|
+| Air Birgers Møbler | 447 kg fragtpligtig vægt, break-point til 500 kg, i alt 9.842,84 DKK |
+| Sea Birgers Møbler, mulighed 1 | 4 × 5.996,32 = 23.985,28 DKK pr. måned |
+| Sea Birgers Møbler, mulighed 2 | 18.950,80 DKK |
+| Sea Birgers Møbler, mulighed 3 | 25.240,60 DKK |
+| DanMeat | 448 kg fragtpligtig vægt, break-point til 500 kg, grundfragt 1.650 EUR |
+
+Volumenvægten for luftfragt regnes med 1 ton = 6 m³ præcist. Air Birgers giver derfor 446,60 kg, og DanMeat giver 448 kg og ikke 449, som en afrundet faktor på 166,67 ville give.
 
 ## Kilder
 

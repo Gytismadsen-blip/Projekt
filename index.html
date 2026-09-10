@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fragtkalkulator</title>
+<title>Fragtberegner</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -27,7 +27,7 @@
 <header class="border-b border-[#1e2836] bg-[#0d131b] sticky top-0 z-20">
   <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
     <div>
-      <div class="text-xl font-bold leading-tight">Fragtkalkulator</div>
+      <div class="text-xl font-bold leading-tight">Fragtberegner</div>
       <div class="text-[11px] text-slate-500">Fragtpligtig vægt, transportpris og totalomkostning &mdash; luft, sø, bane og vej</div>
     </div>
     <div class="ml-auto flex items-center gap-2">
@@ -63,6 +63,14 @@
       <div id="filListe" class="flex-1 space-y-1 text-sm"></div>
       <button id="gemCase" class="text-xs bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg whitespace-nowrap">Gem case</button>
       <button id="rydFiler" class="text-xs bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg whitespace-nowrap">Ryd alt</button>
+    </div>
+    <div id="gemDialog" class="hidden mt-3 border border-[#2b3542] rounded-xl p-3">
+      <label for="gemNavn" class="text-xs text-slate-400">Hvad skal casen hedde?</label>
+      <div class="flex flex-wrap gap-2 mt-1">
+        <input id="gemNavn" class="flex-1 min-w-[200px]" autocomplete="off">
+        <button id="gemBekraeft" class="text-sm bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg font-medium">Gem</button>
+        <button id="gemAnnuller" class="text-sm bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg">Annullér</button>
+      </div>
     </div>
   </div>
 
@@ -361,7 +369,7 @@
         <tr><td>Vejfragt national DK</td><td class="num">4 m³</td><td class="num">250 kg</td></tr>
       </tbody>
     </table></div>
-    <p class="text-xs text-slate-400 mt-3">Måletonnen rundes altid op til hele kg. Ved luftfragt runder mange selskaber op til nærmeste halve kg. Faktoren 166,67 kg pr. m³ er den samme som IATA-reglen 1 kg pr. 6.000 cm³.</p>
+    <p class="text-xs text-slate-400 mt-3">Den fragtpligtige vægt rundes op til hele kg. Ved luftfragt runder mange selskaber op til nærmeste halve kg. Faktoren 166,67 kg pr. m³ er den samme som IATA-reglen 1 kg pr. 6.000 cm³.</p>
     <p class="text-xs text-slate-400 mt-2">Bemærk at faktorerne er branchekonventioner, ikke naturlove. En konkret fragtaftale kan sætte en anden faktor, og så gælder aftalen. Derfor kan feltet redigeres.</p>
     <div class="mt-4 border border-amber-800 bg-amber-950/20 rounded-xl p-3">
       <div class="text-sm font-medium text-amber-300 mb-1">Vær kritisk over for kompendiets tal for bane og vej EU</div>
@@ -374,7 +382,7 @@
     <h2 class="font-semibold mb-2">Trappesatser og break-point</h2>
     <p class="text-sm text-slate-300">Luftfragt sælges i vægtklasser, typisk M for minimum, N for normal under 45 kg og derefter Q45, Q100, Q300, Q500 og opefter. Satsen pr. kg falder, jo tungere forsendelsen er, fordi de faste håndteringsomkostninger fordeles på flere kilo.</p>
     <p class="text-sm text-slate-300 mt-2">Det giver et break-point: et punkt hvor det er billigere at betale for en højere vægt til en lavere sats end for sin egen vægt til en høj sats. Break-pointet findes som næste klasses grænse gange næste klasses sats, divideret med den sats du ellers skulle betale.</p>
-    <p class="text-sm text-slate-300 mt-2">Eksempel: 447 kg til 2,70 USD giver 1.206,90 USD. 500 kg til 2,40 USD giver 1.200,00 USD. Du deklarerer altså 500 kg og sparer 6,90 USD. Kalkulatoren tjekker alle klasser automatisk og markerer den billigste.</p>
+    <p class="text-sm text-slate-300 mt-2">Eksempel: 447 kg til 2,70 USD giver 1.206,90 USD. 500 kg til 2,40 USD giver 1.200,00 USD. Fragten beregnes altså som 500 kg, og der spares 6,90 USD. Godset vejer ikke mere af den grund. Beregneren tjekker alle klasser automatisk og markerer den billigste.</p>
     <p class="text-xs text-slate-400 mt-2">Fælden i eksamensopgaver: tillæg pr. kg beregnes normalt af den fragtpligtige vægt, ikke af den opskrevne vægt. Tjek altid hvad opgaven siger, og skriv din forudsætning ned.</p>
   </div>
 
@@ -418,19 +426,26 @@
         <tr><td>Containerskib</td><td class="num">ca. 12</td></tr>
       </tbody>
     </table></div>
-    <p class="text-xs text-slate-400 mt-2">Tallene er runde gennemsnit til undervisningsbrug. Til rapportering udadtil skal der bruges faktorer efter EN 16258 eller GLEC Framework og transportørens egne data.</p>
+    <p class="text-xs text-slate-400 mt-2">Tallene er runde gennemsnit til undervisningsbrug. Til rapportering udadtil skal der regnes efter ISO 14083, som har afløst EN 16258, og gerne efter GLEC Framework fra Smart Freight Centre, der er bygget til rapportering efter ISO 14083. Brug transportørens egne data, hvor de findes.</p>
   </div>
 
   <div class="card p-4">
     <h2 class="font-semibold mb-2">Kilder</h2>
-    <p class="text-xs text-slate-400">Omregningsfaktorer og w/m-metode: kompendiet International Transport Planning, afsnittet Weight/Measure Calculation. Tillægsordbog og luftfragtprissætning: kompendiet Handbook of Logistics and Distribution Management. Casene Air Birgers Møbler, Sea Birgers Møbler og DanMeat er undervisningsmateriale fra faget Distribution, 3. semester.</p>
+    <ul class="text-xs text-slate-400 space-y-1.5 list-disc pl-5">
+      <li><i>International Transport Planning</i>. Kompendium til faget Distribution, 3. semester. Afsnittet Weight/Measure Calculation, s. 20, og Selection criteria, s. 21. Grundlag for w/m-faktorerne og kriterierne for valg af transportform.</li>
+      <li>Rushton, A., Croucher, P. og Baker, P.: <i>The Handbook of Logistics and Distribution Management</i>. Kogan Page. Anvendt via kompendiet HDLM. Grundlag for tillægsordbogen og luftfragtens prissætning.</li>
+      <li>International Chamber of Commerce: <i>Incoterms® 2020</i>. Grundlag for leveringsbetingelserne under punkt B.</li>
+      <li>ISO 14083:2023: <i>Greenhouse gases — Quantification and reporting of greenhouse gas emissions arising from transport chain operations</i>.</li>
+      <li>Smart Freight Centre: <i>GLEC Framework for Logistics Emissions Accounting and Reporting</i>.</li>
+      <li>Casene Air Birgers Møbler, Sea Birgers Møbler og DanMeat er undervisningsmateriale fra faget Distribution, 3. semester, og bruges som kontrolberegninger med kendt facit.</li>
+    </ul>
   </div>
 </section>
 
 </main>
 
 <footer class="max-w-6xl mx-auto px-4 py-8 text-xs text-slate-500">
-  Fragtkalkulator &mdash; bygget til undervisning i distribution og transportøkonomi. Alle beregninger sker i browseren. Ingen data forlader maskinen.
+  Fragtberegner &mdash; bygget til undervisning i distribution og transportøkonomi. Alle beregninger sker i browseren. Ingen data forlader maskinen.
 </footer>
 
 <script>
@@ -474,7 +489,7 @@ function uid() { return 'l' + Math.random().toString(36).slice(2, 9); }
 function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
 const MODES = {
-  luft:  { navn: 'Luftfragt',              faktor: 166.67, co2: 500 },
+  luft:  { navn: 'Luftfragt',              faktor: 1000 / 6, co2: 500 },
   soe:   { navn: 'Søfragt',                faktor: 1000,   co2: 12 },
   bane:  { navn: 'Banefragt',              faktor: 333.33, co2: 25 },
   vejEU: { navn: 'Vejfragt international', faktor: 333.33, co2: 80 },
@@ -520,7 +535,7 @@ function tomState() {
     kolli: [{ antal: 1, l: 0, b: 0, h: 0, vaegt: 0 }],
     volumenDirekte: 0, antalKolliDirekte: 0,
     vaegtKilde: 'manuel', vaegtTotal: 0, vareVaerdi: 0,
-    mode: 'luft', faktor: 166.67, afrunding: 'kg',
+    mode: 'luft', faktor: 1000 / 6, afrunding: 'kg',
     fragtType: 'trappe', valutaFragt: 'USD',
     tiers: [{ fra: 0, sats: 0 }], minFragt: 0, brugBreakpoint: true,
     wmSats: 0, fastFragt: 0,
@@ -777,6 +792,38 @@ function beregn() {
            poster, tillaegDKK, total, basisVaegt, afregnetVaegt, kurs, vareVaerdi, kapitalbinding, co2 };
 }
 
+// Ugyldige grunddata maa ikke give et resultat, der ser rigtigt ud.
+const MINUS_OK = /kompensation|compensation|rabat|discount|fradrag|godtg|refusion|refund/i;
+function valider() {
+  const s = state, fejl = [];
+  if (s.inputType === 'kolli') {
+    s.kolli.forEach((k, i) => {
+      const maal = [num(k.l), num(k.b), num(k.h)];
+      if (!(maal.some(x => x !== 0) || num(k.vaegt) !== 0)) return;   // tom linje
+      if (num(k.antal) < 1) fejl.push('Kolli-linje ' + (i + 1) + ': antal skal være mindst 1.');
+      if (maal.some(x => x <= 0)) fejl.push('Kolli-linje ' + (i + 1) + ': længde, bredde og højde skal alle være større end 0.');
+      if (num(k.vaegt) < 0) fejl.push('Kolli-linje ' + (i + 1) + ': vægten kan ikke være negativ.');
+    });
+  } else {
+    if (num(s.volumenDirekte) < 0) fejl.push('Rumfanget kan ikke være negativt.');
+    if (num(s.antalKolliDirekte) < 0) fejl.push('Antal kolli kan ikke være negativt.');
+  }
+  if (num(s.vaegtTotal) < 0) fejl.push('Bruttovægten kan ikke være negativ.');
+  if (num(s.vareVaerdi) < 0) fejl.push('Vareværdien kan ikke være negativ.');
+  if (!(num(s.faktor) > 0)) fejl.push('Omregningsfaktoren skal være større end 0.');
+  if (num(s.antalForsendelser) < 1) fejl.push('Antal forsendelser skal være mindst 1.');
+  if ((s.tiers || []).some(t => num(t.sats) < 0 || num(t.fra) < 0)) fejl.push('En vægtklasse har en negativ sats eller grænse.');
+  if (num(s.wmSats) < 0 || num(s.fastFragt) < 0 || num(s.minFragt) < 0) fejl.push('Grundfragten kan ikke være negativ.');
+  s.linjer.forEach(l => {
+    if (l.aktiv && num(l.sats) < 0 && !MINUS_OK.test(l.navn || ''))
+      fejl.push((l.navn || 'En linje') + ' har et negativt beløb. Kun rabat, fradrag og kompensation må være negative, og det skal stå i navnet.');
+  });
+  const k = kursMap();
+  const brugte = [s.valutaFragt].concat(s.linjer.filter(l => l.aktiv && l.type !== 'pct').map(l => l.valuta));
+  Array.from(new Set(brugte)).forEach(v => { if (v && v !== 'DKK' && !(num(k[v]) > 0)) fejl.push('Kursen for ' + v + ' skal være større end 0.'); });
+  return Array.from(new Set(fejl));
+}
+
 function refNavn(ref) {
   if (ref === 'GRUNDFRAGT') return 'grundfragt';
   if (ref === 'VAREVAERDI') return 'vareværdi';
@@ -793,22 +840,22 @@ function tegnKolli() {
   $('#kolliRows').innerHTML = state.kolli.map((k, i) => {
     const m3 = num(k.antal) * (num(k.l) * num(k.b) * num(k.h)) / 1000000;
     return '<tr data-i="' + i + '">' +
-      '<td><input class="num w-16 k" data-f="antal" value="' + esc(k.antal) + '"></td>' +
-      '<td><input class="num w-20 k" data-f="l" value="' + esc(k.l) + '"></td>' +
-      '<td><input class="num w-20 k" data-f="b" value="' + esc(k.b) + '"></td>' +
-      '<td><input class="num w-20 k" data-f="h" value="' + esc(k.h) + '"></td>' +
-      '<td><input class="num w-24 k" data-f="vaegt" value="' + esc(k.vaegt) + '"></td>' +
+      '<td><input class="num w-16 k" data-f="antal" aria-label="Antal, linje ' + (i + 1) + '" value="' + esc(k.antal) + '"></td>' +
+      '<td><input class="num w-20 k" data-f="l" aria-label="Længde i cm, linje ' + (i + 1) + '" value="' + esc(k.l) + '"></td>' +
+      '<td><input class="num w-20 k" data-f="b" aria-label="Bredde i cm, linje ' + (i + 1) + '" value="' + esc(k.b) + '"></td>' +
+      '<td><input class="num w-20 k" data-f="h" aria-label="Højde i cm, linje ' + (i + 1) + '" value="' + esc(k.h) + '"></td>' +
+      '<td><input class="num w-24 k" data-f="vaegt" aria-label="Vægt pr. stk. i kg, linje ' + (i + 1) + '" value="' + esc(k.vaegt) + '"></td>' +
       '<td class="num text-slate-300">' + fmt(m3, 4) + '</td>' +
-      '<td><button class="sletKolli text-slate-500 hover:text-red-400 px-2">✕</button></td></tr>';
+      '<td><button class="sletKolli text-slate-500 hover:text-red-400 px-2" aria-label="Fjern kolli-linje ' + (i + 1) + '">✕</button></td></tr>';
   }).join('');
 }
 
 function tegnTiers() {
   $('#tierRows').innerHTML = state.tiers.map((t, i) =>
     '<tr data-i="' + i + '">' +
-    '<td><input class="num w-24 t" data-f="fra" value="' + esc(t.fra) + '"></td>' +
-    '<td><input class="num w-28 t" data-f="sats" value="' + esc(t.sats) + '"></td>' +
-    '<td><button class="sletTier text-slate-500 hover:text-red-400 px-2">✕</button></td></tr>').join('');
+    '<td><input class="num w-24 t" data-f="fra" aria-label="Vægtklasse gælder fra kg" value="' + esc(t.fra) + '"></td>' +
+    '<td><input class="num w-28 t" data-f="sats" aria-label="Sats pr. kg" value="' + esc(t.sats) + '"></td>' +
+    '<td><button class="sletTier text-slate-500 hover:text-red-400 px-2" aria-label="Fjern vægtklasse">✕</button></td></tr>').join('');
 }
 
 function tegnLinjer() {
@@ -838,7 +885,7 @@ function tegnLinjer() {
       (l.type === 'pct'
         ? '<span class="text-[11px] text-slate-500 pb-2">følger grundlaget</span>'
         : '<label class="flex items-center gap-1.5 text-xs pb-2"><input type="checkbox" class="gentag accent-blue-500"' + (l.gentag ? ' checked' : '') + '> pr. forsendelse</label>') +
-      '<button class="sletLinje text-slate-500 hover:text-red-400 px-2 pb-1">✕</button>' +
+      '<button class="sletLinje text-slate-500 hover:text-red-400 px-2 pb-1" aria-label="Fjern ' + esc(l.navn || 'linjen') + '">✕</button>' +
       '</div>' + refs + '</div>';
   }).join('');
 }
@@ -868,7 +915,7 @@ function tegnResultat() {
     if (r.valgt && !r.valgt.egen) {
       const egen = r.kandidater.find(k => k.egen);
       const spar = egen ? egen.belob - r.valgt.belob : 0;
-      t += '<div class="mt-2 text-xs text-amber-300">Break-point udnyttet: det er billigere at deklarere ' + fmt(r.valgt.vaegt) + ' kg end de ' + fmt(r.fragtpligtig) + ' kg, der faktisk sendes' + (spar > 0 ? '. Besparelse ' + fmt(spar) + ' ' + s.valutaFragt : '') + '.</div>';
+      t += '<div class="mt-2 text-xs text-amber-300">Break-point udnyttet: det er billigere at beregne fragten som ' + fmt(r.valgt.vaegt) + ' kg end efter de ' + fmt(r.fragtpligtig) + ' kg fragtpligtig vægt' + (spar > 0 ? '. Besparelse ' + fmt(spar) + ' ' + s.valutaFragt : '') + '.</div>';
     }
     $('#trappeResultat').innerHTML = t;
   } else $('#trappeResultat').innerHTML = '';
@@ -881,7 +928,19 @@ function tegnResultat() {
   h += '</tbody><tfoot><tr class="border-t-2 border-blue-800"><td colspan="3" class="font-bold text-base pt-3">Samlet fragtomkostning</td><td class="num font-bold text-base text-emerald-300 pt-3">' + fmt(r.total) + ' DKK</td></tr>';
   if (r.antal > 1) h += '<tr><td colspan="3" class="text-xs text-slate-400">Heraf pr. forsendelse</td><td class="num text-xs text-slate-400">' + fmt(r.total / r.antal) + ' DKK</td></tr>';
   h += '</tfoot></table>';
+  const ugyldig = valider();
+  if (ugyldig.length) {
+    h = '<div class="border border-red-800 bg-red-950/30 rounded-xl p-3 mb-3 text-sm text-red-200">' +
+      '<div class="font-medium mb-1">Beregningen er ikke gyldig, før disse ting er rettet:</div>' +
+      '<ul class="list-disc pl-5 space-y-0.5">' + ugyldig.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' + h;
+  }
   $('#resultat').innerHTML = h;
+  const gemKnap = $('#gemScenarie');
+  if (gemKnap) {
+    gemKnap.disabled = ugyldig.length > 0 || !(r.total > 0);
+    gemKnap.classList.toggle('opacity-40', gemKnap.disabled);
+    gemKnap.title = ugyldig.length ? 'Ret fejlene først' : (!(r.total > 0) ? 'Der er ingen pris at gemme endnu' : '');
+  }
 
   tegnVurdering(r);
   tegnFormler(r);
@@ -906,13 +965,17 @@ function tegnVurdering(r) {
   const tillaegAndel = r.total > 0 ? r.tillaegDKK / r.total * 100 : 0;
 
   $('#noegletal').innerHTML =
-    kpi('Pris pr. fragtpligtig kg', fmt(prKgFragt) + ' DKK', 'Total / afregnet vægt') +
-    kpi('Pris pr. faktisk kg', fmt(prKgFaktisk) + ' DKK', 'Det du reelt betaler pr. kg gods') +
-    kpi('Pris pr. m³', fmt(prM3) + ' DKK', '') +
-    kpi('Pris pr. kolli', r.antalKolli > 0 ? fmt(prKolli) + ' DKK' : '&ndash;', '') +
+    kpi('Pris pr. fragtpligtig kg',
+      s.fragtType === 'fast' ? '&ndash;' : (r.fragtpligtig > 0 && r.total > 0 ? fmt(prKgFragt) + ' DKK' : 'Ikke beregnet'),
+      s.fragtType === 'fast' ? 'Fast pris, afregnes ikke pr. kg' : 'Total / afregnet vægt') +
+    kpi('Pris pr. faktisk kg', r.faktiskVaegt > 0 && r.total > 0 ? fmt(prKgFaktisk) + ' DKK' : 'Ikke beregnet',
+      r.faktiskVaegt > 0 ? 'Det du reelt betaler pr. kg gods' : 'Vægten er ikke oplyst') +
+    kpi(s.volumenErKapacitet ? 'Pris pr. m³ kapacitet' : 'Pris pr. m³', r.volumen > 0 && r.total > 0 ? fmt(prM3) + ' DKK' : 'Ikke beregnet',
+      s.volumenErKapacitet ? 'Regnet på containerens plads, ikke på godset' : '') +
+    kpi(s.volumenErKapacitet ? 'Pris pr. container' : 'Pris pr. kolli', r.antalKolli > 0 && r.total > 0 ? fmt(prKolli) + ' DKK' : 'Ikke beregnet', '') +
     kpi('Fragtrate', r.vareVaerdi > 0 ? fmt(fragtrate, 1) + ' %' : '&ndash;', 'Fragt i % af vareværdi') +
     kpi('Vareværdi pr. kg', r.faktiskVaegt > 0 ? fmt(vaerdiPrKg) + ' DKK' : '&ndash;', 'Afgør om luftfragt kan bære sig') +
-    kpi('Tillæggenes andel', fmt(tillaegAndel, 1) + ' %', 'Af den samlede fragtregning') +
+    kpi('Tillæggenes andel', r.total > 0 ? fmt(tillaegAndel, 1) + ' %' : 'Ikke beregnet', 'Af den samlede fragtregning') +
     kpi('CO2-udledning', num(s.afstand) > 0 ? fmt(r.co2, 1) + ' kg' : '&ndash;', num(s.afstand) > 0 ? '' : 'Udfyld afstand under E');
 
   // --- landed cost ---
@@ -945,7 +1008,12 @@ function tegnVurdering(r) {
   if (store.length) add('advarsel', 'Kursen for ' + store.map(v => String(v.kode).toUpperCase()).join(' og ') + ' ser ud til at være angivet pr. 100 enheder. Kurs 745,00 betyder 7,45 DKK pr. euro. Skriv kursen pr. 1 enhed.');
 
   if (r.volumen <= 0) add('info', 'Der er ikke indtastet et rumfang. Uden mål kan volumenvægten ikke kontrolleres, og du risikerer at regne med en for lav fragtpligtig vægt.');
-  if (r.faktiskVaegt <= 0) add('advarsel', 'Der er ikke indtastet en vægt. Gebyrer pr. 100 kg og THC bliver derfor sat for lavt, og fragtpligtig vægt hviler alene på rumfanget.');
+  if (r.faktiskVaegt <= 0) {
+    const vaegtLinjer = state.linjer.filter(l => l.aktiv && (l.type === 'kg' || l.type === 'kg100' || l.type === 'thc'));
+    add(vaegtLinjer.length || state.fragtType === 'trappe' ? 'advarsel' : 'info',
+      'Der er ikke indtastet en vægt, så den fragtpligtige vægt hviler alene på rumfanget.' +
+      (vaegtLinjer.length ? ' Det påvirker ' + vaegtLinjer.map(l => l.navn || LINJE_TYPER[l.type]).join(', ') + ', som regnes efter vægt.' : ''));
+  }
 
   if (r.volumenVaegt > r.faktiskVaegt && r.faktiskVaegt > 0) {
     const ekstra = r.volumenVaegt - r.faktiskVaegt;
@@ -957,7 +1025,7 @@ function tegnVurdering(r) {
 
   if (state.fragtType === 'trappe' && r.valgt && !r.valgt.egen) {
     const egen = r.kandidater.find(x => x.egen);
-    add('ok', 'Break-pointet er udnyttet. Der deklareres ' + fmt(r.valgt.vaegt) + ' kg i stedet for ' + fmt(r.fragtpligtig) + ' kg' + (egen ? ', hvilket sparer ' + fmt(egen.belob - r.valgt.belob) + ' ' + state.valutaFragt : '') + '. Husk at skrive begrundelsen ind i din besvarelse — det er ikke selvindlysende for læseren.');
+    add('ok', 'Break-pointet er udnyttet. Fragten beregnes som ' + fmt(r.valgt.vaegt) + ' kg i stedet for ' + fmt(r.fragtpligtig) + ' kg' + (egen ? ', hvilket sparer ' + fmt(egen.belob - r.valgt.belob) + ' ' + state.valutaFragt : '') + '. Husk at skrive begrundelsen ind i din besvarelse — det er ikke selvindlysende for læseren.');
   }
   if (state.fragtType === 'trappe' && !state.brugBreakpoint && r.kandidater.length > 1) {
     const bedst = r.kandidater.reduce((a, b) => b.belob < a.belob ? b : a);
@@ -965,7 +1033,7 @@ function tegnVurdering(r) {
   }
   if (state.fragtType === 'trappe' && r.valgt && r.valgt.egen) {
     const naeste = r.kandidater.filter(x => !x.egen).sort((a, b) => a.belob - b.belob)[0];
-    if (naeste && naeste.belob < r.valgt.belob * 1.05) add('info', 'Du ligger tæt på et break-point. Vokser forsendelsen bare lidt, bliver det billigere at deklarere ' + fmt(naeste.vaegt) + ' kg. Nævn det som en anbefaling til fremtidige ordrer.');
+    if (naeste && naeste.belob < r.valgt.belob * 1.05) add('info', 'Du ligger tæt på et break-point. Vokser forsendelsen bare lidt, bliver det billigere at beregne fragten som ' + fmt(naeste.vaegt) + ' kg. Nævn det som en anbefaling til fremtidige ordrer.');
   }
   if (r.minRamt) add('advarsel', 'Minimumssatsen slår igennem. Forsendelsen er så lille, at du betaler for luft. Overvej at samle flere ordrer i én forsendelse, eller vælg en billigere transportform.');
 
@@ -1038,33 +1106,36 @@ function udregningTekst() {
   const L = [];
   L.push((s.caseNavn || 'Fragtberegning') + ' - ' + MODES[s.mode].navn);
   L.push('');
-  L.push('1. VAEGT OG VOLUMEN');
-  L.push('Volumen i alt: ' + fmt(r.volumen, 4) + ' m3');
-  L.push('Faktisk bruttovaegt: ' + fmt(r.faktiskVaegt) + ' kg');
-  L.push('Volumenvaegt: ' + fmt(r.volumen, 4) + ' m3 x ' + fmt(num(s.faktor), 2) + ' kg/m3 = ' + fmt(r.volumenVaegt) + ' kg');
-  L.push('Fragtpligtig vaegt (den stoerste af de to): ' + fmt(r.fragtpligtig) + ' kg');
-  L.push('Maaleton (w/m): ' + fmt(r.maaleton, 3));
+  L.push('1. VÆGT OG VOLUMEN');
+  L.push('Volumen i alt: ' + fmt(r.volumen, 4) + ' m³');
+  L.push('Faktisk bruttovægt: ' + fmt(r.faktiskVaegt) + ' kg');
+  L.push('Volumenvægt: ' + fmt(r.volumen, 4) + ' m³ × ' + fmt(num(s.faktor), 2) + ' kg/m³ = ' + fmt(r.volumenVaegt) + ' kg');
+  L.push('Fragtpligtig vægt (den største af de to): ' + fmt(r.fragtpligtig) + ' kg');
+  L.push('Måleton (w/m): ' + fmt(r.maaleton, 3));
   L.push('');
   if (s.fragtType === 'trappe' && r.kandidater.length) {
-    L.push('2. VALG AF VAEGTKLASSE');
-    r.kandidater.forEach(k => L.push('   ' + fmt(k.vaegt) + ' kg x ' + fmt(k.sats, 2) + ' ' + s.valutaFragt + '/kg = ' + fmt(k.belob) + ' ' + s.valutaFragt + (k === r.valgt ? '   <-- billigst, vaelges' : '')));
+    L.push('2. VALG AF VÆGTKLASSE');
+    r.kandidater.forEach(k => L.push('   ' + fmt(k.vaegt) + ' kg × ' + fmt(k.sats, 2) + ' ' + s.valutaFragt + '/kg = ' + fmt(k.belob) + ' ' + s.valutaFragt + (k === r.valgt ? '   ← billigst, vælges' : '')));
     L.push('');
   }
   L.push('3. PRISEN');
-  L.push('Grundfragt: ' + r.fragtForklaring + (r.antal > 1 ? ' x ' + r.antal + ' forsendelser' : '') + ' = ' + fmt(r.grundfragtOrig) + ' ' + s.valutaFragt + ' = ' + fmt(r.grundfragtDKK) + ' DKK');
+  L.push('Grundfragt: ' + r.fragtForklaring + (r.antal > 1 ? ' × ' + r.antal + ' forsendelser' : '') + ' = ' + fmt(r.grundfragtOrig) + ' ' + s.valutaFragt + ' = ' + fmt(r.grundfragtDKK) + ' DKK');
   r.poster.forEach(p => L.push(p.navn + ': ' + p.forklaring + ' = ' + fmt(p.belob) + ' ' + p.valuta + ' = ' + fmt(p.dkk) + ' DKK'));
   L.push('');
   L.push('SAMLET FRAGTOMKOSTNING: ' + fmt(r.total) + ' DKK');
   if (r.antal > 1) L.push('Pr. forsendelse: ' + fmt(r.total / r.antal) + ' DKK');
   L.push('');
-  L.push('4. NOEGLETAL');
+  L.push('4. NØGLETAL');
   if (r.faktiskVaegt > 0) L.push('Pris pr. faktisk kg: ' + fmt(r.total / (r.faktiskVaegt * r.antal)) + ' DKK');
-  if (r.volumen > 0) L.push('Pris pr. m3: ' + fmt(r.total / (r.volumen * r.antal)) + ' DKK');
+  if (r.volumen > 0) L.push('Pris pr. m³: ' + fmt(r.total / (r.volumen * r.antal)) + ' DKK');
   if (r.vareVaerdi > 0) L.push('Fragtrate (fragt i % af vareværdi): ' + fmt(r.total / r.vareVaerdi * 100, 1) + ' %');
   if (r.vareVaerdi > 0) L.push('Kapitalbinding under transport: ' + fmt(r.kapitalbinding) + ' DKK');
   if (num(s.afstand) > 0) L.push('CO2: ' + fmt(r.co2, 1) + ' kg');
   L.push('');
-  L.push('Forudsaetninger: ' + s.valutaer.map(v => '1 ' + v.kode + ' = ' + fmt(num(v.kurs)) + ' DKK').join(', ') + '. Omregningsfaktor ' + fmt(num(s.faktor), 2) + ' kg pr. m3. Vaegten rundes ' + (s.afrunding === 'kg' ? 'op til hele kg' : s.afrunding === 'halvkg' ? 'op til halve kg' : 'ikke') + '.');
+  // kun de valutaer, der faktisk er brugt i beregningen
+  const brugteV = Array.from(new Set([s.valutaFragt].concat(s.linjer.filter(l => l.aktiv && l.type !== 'pct').map(l => l.valuta)))).filter(v => v && v !== 'DKK');
+  L.push('Forudsætninger: ' + (brugteV.length ? brugteV.map(v => '1 ' + v + ' = ' + fmt(num(r.kurs[v])) + ' DKK').join(', ') + '. ' : 'Alle beløb er i DKK. ') +
+    'Omregningsfaktor ' + fmt(num(s.faktor), 2) + ' kg pr. m³. Vægten rundes ' + (s.afrunding === 'kg' ? 'op til hele kg' : s.afrunding === 'halvkg' ? 'op til halve kg' : 'ikke') + '.');
   return L.join('\n');
 }
 
@@ -1083,8 +1154,10 @@ function tegnSammenlign() {
     return;
   }
   const minPris = Math.min.apply(null, arr.map(a => a.total));
-  let h = '<table class="text-sm w-full min-w-[860px]"><thead class="text-slate-400 text-xs uppercase"><tr>' +
-    '<th class="text-left">Mulighed</th><th class="text-left">Form</th><th class="text-right">m³</th><th class="text-right">Fragt DKK</th>' +
+  // Det gods, der faktisk sendes, er det samme i alle muligheder. En container er plads, ikke gods.
+  const godsM3 = Math.max.apply(null, [0].concat(arr.filter(a => !a.erKapacitet && num(a.volumen) > 0).map(a => num(a.volumen))));
+  let h = '<table class="text-sm w-full min-w-[940px]"><thead class="text-slate-400 text-xs uppercase"><tr>' +
+    '<th class="text-left">Mulighed</th><th class="text-left">Form</th><th class="text-right">Gods m³</th><th class="text-right">Kapacitet m³</th><th class="text-right">Udnyttelse</th><th class="text-right">Fragt DKK</th>' +
     '<th class="text-right">Merpris</th><th class="text-right">Kapitalbind.</th><th class="text-right">Total DKK</th>' +
     '<th class="text-right">Tid</th><th class="text-right">Afg./md</th><th class="text-right">Sikkerh.</th><th class="text-right">CO2 kg</th><th></th></tr></thead><tbody class="divide-y divide-[#1e2836]">';
   arr.forEach((a, i) => {
@@ -1093,7 +1166,9 @@ function tegnSammenlign() {
       '<td class="font-medium">' + esc(a.navn) + (b ? ' <span class="text-emerald-400 text-xs">billigst fragt</span>' : '') +
         (a.beskrivelse ? '<div class="text-[11px] text-slate-500 font-normal max-w-[280px] truncate">' + esc(a.beskrivelse) + '</div>' : '') + '</td>' +
       '<td class="text-slate-400">' + esc(a.mode) + '</td>' +
-      '<td class="num">' + (num(a.volumen) > 0 ? fmt(num(a.volumen), 1) : '&ndash;') + '</td>' +
+      '<td class="num">' + (a.erKapacitet ? (godsM3 > 0 ? fmt(godsM3, 1) : '&ndash;') : (num(a.volumen) > 0 ? fmt(num(a.volumen), 1) : '&ndash;')) + '</td>' +
+      '<td class="num">' + (a.erKapacitet ? fmt(num(a.volumen), 1) : '&ndash;') + '</td>' +
+      '<td class="num">' + (a.erKapacitet && godsM3 > 0 ? fmt(godsM3 / num(a.volumen) * 100, 0) + ' %' : '&ndash;') + '</td>' +
       '<td class="num font-semibold">' + fmt(a.total) + '</td>' +
       '<td class="num text-slate-400">' + (b ? '&ndash;' : '+' + fmt(a.total - minPris)) + '</td>' +
       '<td class="num text-slate-400">' + fmt(a.kapital || 0) + '</td>' +
@@ -1102,7 +1177,7 @@ function tegnSammenlign() {
       '<td class="num">' + fmt(a.frekvens || 0, 0) + '</td>' +
       '<td class="num">' + fmt(a.paalidelighed || 0, 0) + '</td>' +
       '<td class="num">' + (a.co2 ? fmt(a.co2, 0) : '&ndash;') + '</td>' +
-      '<td class="text-right whitespace-nowrap"><button class="hentSc text-blue-400 hover:text-blue-300 text-xs px-2" data-i="' + i + '">hent</button><button class="sletSc text-slate-500 hover:text-red-400 px-2" data-i="' + i + '">✕</button></td></tr>';
+      '<td class="text-right whitespace-nowrap"><button class="hentSc text-blue-400 hover:text-blue-300 text-xs px-2" data-i="' + i + '">hent</button><button class="sletSc text-slate-500 hover:text-red-400 px-2" data-i="' + i + '" aria-label="Fjern ' + esc(a.navn) + '">✕</button></td></tr>';
   });
   h += '</tbody></table>';
   $('#sammenlignBoks').innerHTML = h;
@@ -1113,37 +1188,54 @@ function tegnSammenlign() {
 function tegnPoint(arr) {
   const w = { pris: num($('#wPris').value), tid: num($('#wTid').value), frek: num($('#wFrek').value), paal: num($('#wPaal').value), co2: num($('#wCo2').value) };
   const sum = w.pris + w.tid + w.frek + w.paal + w.co2;
-  $('#vaegtSum').textContent = 'Vægte i alt: ' + fmt(sum, 0) + ' %' + (Math.abs(sum - 100) > 0.5 ? ' — bør give 100' : ' ✔');
+  const sumOk = Math.abs(sum - 100) <= 0.5;
+  $('#vaegtSum').textContent = 'Vægte i alt: ' + fmt(sum, 0) + ' %' + (sumOk ? ' ✔' : ' — skal give 100');
+  if (arr.length < 2) { $('#pointBoks').innerHTML = '<div class="text-sm text-slate-400">Pointmodellen kræver mindst to muligheder.</div>'; return; }
 
-  // point: lavere er bedre for pris/tid/co2, højere er bedre for frekvens/pålidelighed
-  const val = arr.map(a => ({
-    pris: a.total + (a.kapital || 0),
-    tid: num(a.tid), frek: num(a.frekvens), paal: num(a.paalidelighed), co2: num(a.co2)
-  }));
-  function point(vals, i, lavereBedst) {
-    const xs = vals.filter(v => isFinite(v));
-    const mn = Math.min.apply(null, xs), mx = Math.max.apply(null, xs);
-    if (mx === mn) return 100;
-    const v = vals[i];
-    return lavereBedst ? (mx - v) / (mx - mn) * 100 : (v - mn) / (mx - mn) * 100;
-  }
-  let h = '<table class="text-sm w-full min-w-[620px]"><thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Mulighed</th><th class="text-right">Pris</th><th class="text-right">Tid</th><th class="text-right">Frekvens</th><th class="text-right">Sikkerhed</th><th class="text-right">CO2</th><th class="text-right">Samlet point</th></tr></thead><tbody class="divide-y divide-[#1e2836]">';
-  const totaler = [];
-  arr.forEach((a, i) => {
-    const p = {
-      pris: point(val.map(v => v.pris), i, true),
-      tid: point(val.map(v => v.tid), i, true),
-      frek: point(val.map(v => v.frek), i, false),
-      paal: point(val.map(v => v.paal), i, false),
-      co2: point(val.map(v => v.co2), i, true)
-    };
-    const t = sum > 0 ? (p.pris * w.pris + p.tid * w.tid + p.frek * w.frek + p.paal * w.paal + p.co2 * w.co2) / sum : 0;
-    totaler.push(t);
-    h += '<tr data-r="' + i + '"><td>' + esc(a.navn) + '</td><td class="num text-slate-400">' + fmt(p.pris, 0) + '</td><td class="num text-slate-400">' + fmt(p.tid, 0) + '</td><td class="num text-slate-400">' + fmt(p.frek, 0) + '</td><td class="num text-slate-400">' + fmt(p.paal, 0) + '</td><td class="num text-slate-400">' + fmt(p.co2, 0) + '</td><td class="num font-semibold">' + fmt(t, 1) + '</td></tr>';
+  const KRIT = [
+    { k: 'pris', navn: 'Pris', lavereBedst: true, v: x => x.total + (x.kapital || 0) },
+    { k: 'tid', navn: 'Transporttid', lavereBedst: true, v: x => num(x.tid) },
+    { k: 'frek', navn: 'Frekvens', lavereBedst: false, v: x => num(x.frekvens) },
+    { k: 'paal', navn: 'Leveringssikkerhed', lavereBedst: false, v: x => num(x.paalidelighed) },
+    { k: 'co2', navn: 'CO2', lavereBedst: true, v: x => num(x.co2) }
+  ];
+  // Et kriterium taeller kun, naar alle muligheder har en vaerdi, og vaerdierne er forskellige.
+  // Ellers ville alle faa 100 point for noget, der ikke er maalt.
+  KRIT.forEach(c => {
+    c.vals = arr.map(c.v);
+    const alleHar = c.vals.every(x => isFinite(x) && x > 0);
+    c.mn = Math.min.apply(null, c.vals); c.mx = Math.max.apply(null, c.vals);
+    c.grund = !alleHar ? 'mangler data' : (c.mx === c.mn ? 'ingen forskel' : (w[c.k] <= 0 ? 'vægt 0 %' : ''));
+    c.brugbar = !c.grund;
+  });
+  const brugte = KRIT.filter(c => c.brugbar);
+  const vSum = brugte.reduce((t, c) => t + w[c.k], 0);
+  const pt = (c, i) => c.lavereBedst ? (c.mx - c.vals[i]) / (c.mx - c.mn) * 100 : (c.vals[i] - c.mn) / (c.mx - c.mn) * 100;
+
+  let h = '<table class="text-sm w-full min-w-[620px]"><thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Mulighed</th>' +
+    KRIT.map(c => '<th class="text-right">' + c.navn + '</th>').join('') + '<th class="text-right">Samlet point</th></tr></thead><tbody class="divide-y divide-[#1e2836]">';
+  const totaler = arr.map((x, i) => vSum > 0 ? brugte.reduce((t, c) => t + pt(c, i) * w[c.k], 0) / vSum : null);
+  arr.forEach((x, i) => {
+    h += '<tr><td>' + esc(x.navn) + '</td>' +
+      KRIT.map(c => '<td class="num text-slate-400">' + (c.brugbar ? fmt(pt(c, i), 0) : '&ndash;') + '</td>').join('') +
+      '<td class="num font-semibold">' + (totaler[i] === null ? '&ndash;' : fmt(totaler[i], 1)) + '</td></tr>';
   });
   h += '</tbody></table>';
-  const best = totaler.length ? totaler.indexOf(Math.max.apply(null, totaler)) : -1;
-  if (best >= 0) h += '<div class="mt-3 text-sm text-emerald-300">Højeste point med de valgte vægte: <span class="font-semibold">' + esc(arr[best].navn) + '</span>. Modellen er kun så god som dine vægte — begrund dem i din analyse.</div>';
+
+  const ude = KRIT.filter(c => !c.brugbar);
+  if (ude.length) h += '<div class="mt-3 text-xs text-slate-400">Ikke med i pointene: ' +
+    ude.map(c => c.navn + ' (' + c.grund + ')').join(', ') + '. Udfyld værdierne for hver mulighed, eller sæt kriteriets vægt til 0 %.</div>';
+  if (!sumOk) h += '<div class="mt-2 text-sm text-amber-300">Foreløbigt resultat: vægtene giver ' + fmt(sum, 0) + ' %, ikke 100 %.</div>';
+
+  if (!brugte.length) {
+    h += '<div class="mt-2 text-sm text-slate-300">Ingen kriterier kan skille mulighederne ad endnu, så der gives ingen anbefaling.</div>';
+  } else if (brugte.length === 1 && brugte[0].k === 'pris') {
+    h += '<div class="mt-2 text-sm text-slate-300">Kun prisen skiller mulighederne ad, så pointmodellen giver det samme som prissammenligningen. Den bliver først en rigtig beslutningsmodel, når de andre kriterier er udfyldt.</div>';
+  } else {
+    const best = totaler.indexOf(Math.max.apply(null, totaler));
+    h += '<div class="mt-2 text-sm ' + (sumOk ? 'text-emerald-300' : 'text-amber-300') + '">Højeste point med de valgte vægte: <span class="font-semibold">' +
+      esc(arr[best].navn) + '</span>. Modellen er kun så god som dine vægte, så begrund dem i din analyse.</div>';
+  }
   $('#pointBoks').innerHTML = h;
 }
 
@@ -1183,11 +1275,17 @@ function skrivGemteCases(a) {
   catch (e) { alert('Der er ikke plads til flere gemte cases i browseren. Slet en af de gamle først.'); return false; }
 }
 
-function gemDenneCase() {
+function gemDenneCase(navn) {
   if (!fund.length && !samletTekst.trim()) { alert('Der er ikke noget at gemme endnu. Upload en case først.'); return; }
   const forslag = (samletTekst.match(/=====\s*(.+?)\s*=====/) || [])[1] || 'Case ' + new Date().toLocaleDateString('da-DK');
-  const navn = prompt('Hvad skal casen hedde?', forslag);
-  if (navn === null) return;
+  if (navn === undefined) {
+    // foerst spoerges der om navnet i sidens egen dialog
+    $('#gemNavn').value = forslag;
+    $('#gemDialog').classList.remove('hidden');
+    try { $('#gemNavn').focus(); $('#gemNavn').select(); } catch (e) {}
+    return;
+  }
+  $('#gemDialog').classList.add('hidden');
   const rent = String(navn).trim() || forslag;
 
   const arr = hentGemteCases();
@@ -1287,7 +1385,8 @@ function byggFormler(r) {
   t('3. Fragtpligtig vægt', [
     'Der betales for det største: den faktiske vægt eller volumenvægten',
     'Faktisk vægt ' + fmt(r.faktiskVaegt) + ' kg  mod  volumenvægt ' + fmt(r.volumenVaegt, 2) + ' kg',
-    r.styrende === 'rumfanget' ? 'Rumfanget er størst, så det styrer prisen' : 'Vægten er størst, så den styrer prisen'
+    (r.faktiskVaegt <= 0 && r.volumenVaegt <= 0) ? 'Der er hverken indtastet vægt eller rumfang endnu'
+      : r.styrende === 'rumfanget' ? 'Rumfanget er størst, så det styrer prisen' : 'Vægten er størst, så den styrer prisen'
   ], fmt(r.fragtpligtig) + ' kg');
 
   // 4. grundfragt
@@ -1295,7 +1394,7 @@ function byggFormler(r) {
     const l = r.kandidater.map(k =>
       fmt(k.vaegt) + ' kg × ' + fmt(k.sats, 2) + ' ' + s.valutaFragt + '/kg  =  ' + fmt(k.belob, 2) + ' ' + s.valutaFragt +
       '   (klasse Q' + fmt(k.fra, 0) + ')' + (k === r.valgt ? '   ← billigst' : ''));
-    if (r.valgt && !r.valgt.egen) l.push('Break-point: der deklareres ' + fmt(r.valgt.vaegt) + ' kg i stedet for ' + fmt(r.fragtpligtig) + ' kg');
+    if (r.valgt && !r.valgt.egen) l.push('Break-point: fragten beregnes som ' + fmt(r.valgt.vaegt) + ' kg i stedet for ' + fmt(r.fragtpligtig) + ' kg');
     if (r.minRamt) l.push('Beløbet er under minimumssatsen M, så M gælder');
     t('4. Valg af vægtklasse', l, fmt(r.grundfragtPrForsendelse, 2) + ' ' + s.valutaFragt);
   } else if (s.fragtType === 'wm') {
@@ -1303,6 +1402,8 @@ function byggFormler(r) {
       'Måleton = fragtpligtig vægt i ton = ' + fmt(r.fragtpligtig) + ' kg ÷ 1.000',
       fmt(r.maaleton, 3) + ' w/m × ' + fmt(num(s.wmSats), 2) + ' ' + s.valutaFragt + '/w/m'
     ], fmt(r.grundfragtPrForsendelse, 2) + ' ' + s.valutaFragt);
+  } else if (s.fragtType === 'trappe') {
+    t('4. Valg af vægtklasse', ['Der er ikke indtastet nogen vægtklasser med en sats endnu'], fmt(r.grundfragtPrForsendelse, 2) + ' ' + s.valutaFragt);
   } else {
     t('4. Grundfragt', ['Fast pris efter tilbuddet'], fmt(r.grundfragtPrForsendelse, 2) + ' ' + s.valutaFragt);
   }
@@ -1410,8 +1511,24 @@ function findVirksomhedKandidater(tekst) {
     if (!kandidater[k]) kandidater[k] = { navn: k, antal: 0, foerste: m.index };
     kandidater[k].antal++;
   }
+  // Forkortelser taeller med: "Birgers Furniture" omtales i resten af casen som "BF"
+  Object.keys(kandidater).forEach(k => {
+    const ord = k.split(/[ \-]+/).filter(Boolean);
+    if (ord.length < 2) return;
+    const ini = ord.map(x => x[0]).join('').toUpperCase();
+    if (ini.length < 2 || ini.length > 4) return;
+    kandidater[k].antal += (t.match(new RegExp('\\b' + ini + "(?:'s|s)?\\b", 'g')) || []).length;
+  });
+  // Den der tilbyder transporten, er ikke den der skal vaelge mellem tilbuddene:
+  // "contacted A-Line", "A-Line would deliver", "A-Line offered"
+  Object.keys(kandidater).forEach(k => {
+    const e = k.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&');
+    const re2 = new RegExp('(?:contacted|kontaktede|offer from|tilbud fra|quote from|received .{0,20}from)\\s+' + e +
+      '|' + e + '\\s+(?:would|offered|offerede|tilbød|had told|quoted|already had)', 'gi');
+    kandidater[k].tilbyder = (t.match(re2) || []).length;
+  });
   const liste = Object.keys(kandidater).map(k => kandidater[k]);
-  if (!liste.length) return '';
+  if (!liste.length) return [];
   // Et firmanavn naevnes mere end én gang, eller har en selskabsform.
   // Overskrifter og enkeltstaaende ord falder derved fra.
   const brugbare = liste.filter(x => x.antal >= 2 || SELSKABSFORM.test(x.navn));
@@ -1424,7 +1541,12 @@ function findVirksomhedKandidater(tekst) {
     if (SELSKABSFORM.test(x.navn)) x.point += 6;                    // A/S, Ltd, GmbH osv.
     if (x.navn.split(/[ \-]/).length >= 2) x.point += 2;            // flerleddet navn
     if (/^[A-ZÆØÅ\-]+$/.test(x.navn)) x.point += 1;                 // DAN-MEAT
+    x.point -= 3 * Math.min(x.tilbyder || 0, 3);                    // tilbyder transporten
   });
+  // Blandt de bedste bud vinder den, casen naevner foerst
+  const top = Math.max.apply(null, endelig.map(x => x.point));
+  const foerst = endelig.filter(x => x.point >= top - 1).sort((a, b) => a.foerste - b.foerste)[0];
+  if (foerst) foerst.point += 2;
   endelig.sort((a, b) => b.point - a.point || a.foerste - b.foerste);
   return endelig.slice(0, 5).map(x => x.navn);
 }
@@ -1476,9 +1598,9 @@ function prosaEnkelt(r, navn) {
     if (!r.valgt.egen && egen) {
       p2 = 'Med en fragtpligtig vægt på ' + fmtKg(r.fragtpligtig) + ' kg falder forsendelsen i vægtklasse Q' + fmt(egen.fra, 0) +
         ' til ' + fmt(egen.sats, 2) + ' ' + val + '/kg, hvilket giver ' + fmt(egen.belob) + ' ' + val +
-        '. Det er imidlertid billigere at deklarere ' + fmtKg(r.valgt.vaegt) + ' kg til Q' + fmt(r.valgt.fra, 0) + '-raten på ' +
+        '. Det er imidlertid billigere at beregne fragten som ' + fmtKg(r.valgt.vaegt) + ' kg efter Q' + fmt(r.valgt.fra, 0) + '-raten på ' +
         fmt(r.valgt.sats, 2) + ' ' + val + '/kg, som giver ' + fmt(r.valgt.belob) + ' ' + val +
-        '. Der betales derfor for ' + fmtKg(r.valgt.vaegt) + ' kg, hvilket sparer ' + fmt(egen.belob - r.valgt.belob) + ' ' + val + '.';
+        '. Dermed spares ' + fmt(egen.belob - r.valgt.belob) + ' ' + val + '.';
     } else if (r.minRamt) {
       p2 = 'Forsendelsen er så lille, at den beregnede fragt falder under minimumssatsen. Der afregnes derfor efter minimumssatsen på ' +
         fmt(num(s.minFragt)) + ' ' + val + '.';
@@ -1611,13 +1733,24 @@ function prosaFlere(arr, billigst, rest, dyrest, kort) {
   if (medTid.length > 1) {
     const h = medTid.reduce((a, b) => num(b.tid) < num(a.tid) ? b : a);
     const l = medTid.reduce((a, b) => num(b.tid) > num(a.tid) ? b : a);
-    p5 += num(h.tid) === num(l.tid)
-      ? 'Transporttiden er den samme for mulighederne, så den kan ikke bruges til at skille dem ad. '
-      : kort(h.navn) + ' er hurtigst med ' + fmt(num(h.tid), 0) + ' dage mod ' + fmt(num(l.tid), 0) + ' dage for den langsomste, og binder derfor mindst kapital undervejs. ';
+    const FORSINK = /prolonged|forl(?:æ|ae)nget|delay|forsink|no guarantee|ingen garanti/i;
+    const usikre = arr.filter(x => FORSINK.test(x.prosa || ''));
+    if (num(h.tid) === num(l.tid)) {
+      p5 += usikre.length
+        ? 'Den normale transporttid er ' + fmt(num(h.tid), 0) + ' dage for alle muligheder, men for ' + usikre.map(x => kort(x.navn)).join(' og ') +
+          ' er der ikke garanti for, at den holder, og leveringen kan blive forsinket. '
+        : 'Transporttiden er den samme for mulighederne, så den kan ikke bruges til at skille dem ad. ';
+    } else {
+      p5 += kort(h.navn) + ' er hurtigst med ' + fmt(num(h.tid), 0) + ' dage mod ' + fmt(num(l.tid), 0) + ' dage for den langsomste, og binder derfor mindst kapital undervejs. ';
+    }
   }
-  p5 += 'Samlegods håndteres flere gange undervejs, mens en hel container plomberes ét sted og åbnes ét sted, ' +
-    'hvilket mindsker risikoen for skade og svind. Dertil kommer, at transportørens ansvar er beløbsbegrænset, ' +
-    'så en forsikring bør indgå i vurderingen.';
+  const erSamlegods = x => x.state && x.state.mode === 'soe' && x.state.fragtType === 'wm';
+  const erContainer = x => x.state && x.state.mode === 'soe' && (x.erKapacitet || x.state.fragtType === 'fast');
+  if (arr.some(erSamlegods) && arr.some(erContainer)) {
+    p5 += 'Samlegods håndteres flere gange undervejs, mens en hel container plomberes ét sted og åbnes ét sted, ' +
+      'hvilket mindsker risikoen for skade og svind. ';
+  }
+  p5 += 'Dertil kommer, at transportørens ansvar er beløbsbegrænset, så en forsikring bør indgå i vurderingen.';
   af.push(p5);
 
   let p6 = virk
@@ -1646,8 +1779,9 @@ function konklusionNoter(r) {
 function visKonklusion(afsnit, noter, ekstra) {
   const tekst = afsnit.join(String.fromCharCode(10) + String.fromCharCode(10));
   let h = '<div class="border border-[#1e2836] rounded-xl p-4">' +
-    '<div class="flex items-center gap-3 mb-3"><span class="font-semibold text-sm">Konklusion</span>' +
+    '<div class="flex items-center gap-3 mb-3"><span class="font-semibold text-sm">Udkast til konklusion</span>' +
     '<button id="kopierKonklusion" class="ml-auto text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg font-medium">Kopiér konklusion</button></div>' +
+    '<div class="text-[11px] text-slate-500 mb-3">Teksten bygger kun på dine tal og casens egen tekst. Læs den igennem og ret den, før du bruger den.</div>' +
     '<div id="konklusionTekst" class="space-y-3 text-sm text-slate-200 leading-relaxed" data-tekst="' + esc(tekst) + '">' +
     afsnit.map(x => '<p>' + esc(x) + '</p>').join('') + '</div></div>';
   if (ekstra) h += ekstra;
@@ -1722,7 +1856,7 @@ function fyldFormular() {
   $('#vaegtTotal').value = s.vaegtTotal;
   $('#vareVaerdi').value = s.vareVaerdi;
   $('#mode').value = s.mode;
-  $('#faktor').value = s.faktor;
+  $('#faktor').value = fmt(num(s.faktor), 2);
   $('#afrunding').value = s.afrunding;
   $('#fragtType').value = s.fragtType;
   $('#valutaFragt').innerHTML = valutaKoder().map(v => '<option>' + v + '</option>').join('');
@@ -2392,7 +2526,7 @@ function findVaerdier(tekst) {
   Object.keys(grupper).forEach(k => {
     const g = grupper[k].filter(x => !x.usikker);
     if (g.length < 2) return;
-    g.forEach((x, i) => { x.alternativ = true; x.valgt = i === 0; });
+    g.forEach((x, i) => { x.alternativ = true; x.altGruppe = k; x.valgt = i === 0; });
   });
 
   markerKonflikter(f);
@@ -2513,7 +2647,7 @@ function fundKort(f) {
     (f.konflikt ? 'border-amber-900' : 'border-[#1e2836]') + (f.usikker ? ' opacity-70' : '') + '" data-id="' + f.id + '">' +
     '<input type="checkbox" class="fundCheck accent-emerald-500 mt-1"' + (f.valgt ? ' checked' : '') + '>' +
     '<div class="flex-1 min-w-0">' +
-    '<div class="text-sm"><span class="mr-1">' + (FUND_IKON[f.type] || '•') + '</span><span class="font-medium">' + esc(f.label) + '</span> <span class="text-blue-300">' + esc(f.vaerdi) + '</span>' +
+    '<div class="text-sm"><span class="mr-1">' + (FUND_IKON[f.type] || '•') + '</span><span class="font-medium">' + esc(f.label) + '</span> <span class="text-blue-300">' + esc(f.vaerdi) + '</span>' + (f.alternativ ? ' <span class="badge bg-blue-900/60 text-blue-200">vælg én rute</span>' : '') +
     (f.konflikt ? ' <span class="badge bg-amber-900/60 text-amber-200">vælg én</span>' : '') +
     (f.usikker ? ' <span class="badge bg-slate-700 text-slate-300">kontrollér selv</span>' : '') + '</div>' +
     '<div class="text-[11px] text-slate-500 mt-0.5 truncate">fundet i teksten: &laquo;' + esc(f.kilde) + '&raquo;</div>' +
@@ -2693,7 +2827,11 @@ function indsaetFund() {
   // Muligheder hoerer til én case. Er der lagt en ny case ind, ryddes de gamle.
   const casenavn = caseNavnFraFiler() || 'Beregning';
   let start = hentScenarier();
-  if (aktivCase && aktivCase !== casenavn) { start = []; gemScenarier([]); }
+  if (aktivCase && aktivCase !== casenavn) start = [];
+  // Samme case sat ind igen: de muligheder, der kom fra casen sidst, erstattes.
+  // Muligheder man selv har gemt med Gem som mulighed, bliver staaende.
+  start = start.filter(x => !(x.import && x.case === casenavn));
+  gemScenarier(start);
   aktivCase = casenavn;
 
   if (mulige.length > 1) {
@@ -2707,7 +2845,7 @@ function indsaetFund() {
       const gemtState = state;
       state = st;
       const r = beregn();
-      arr.push({ navn: a.navn, beskrivelse: a.beskrivelse || '', case: casenavn, mode: MODES[st.mode].navn, vaegt: r.fragtpligtig, total: r.total,
+      arr.push({ import: true, navn: a.navn, beskrivelse: a.beskrivelse || '', case: casenavn, mode: MODES[st.mode].navn, vaegt: r.fragtpligtig, total: r.total,
         kapital: r.kapitalbinding, tid: num(st.transportTid), frekvens: num(st.frekvens),
         paalidelighed: num(st.paalidelighed), co2: r.co2, volumen: r.volumen * r.antal,
         erKapacitet: !!st.volumenErKapacitet,
@@ -2780,7 +2918,7 @@ function bind() {
     state.mode = e.target.value;
     state.faktor = MODES[e.target.value].faktor;
     state.co2Faktor = MODES[e.target.value].co2;
-    $('#faktor').value = state.faktor; $('#co2Faktor').value = state.co2Faktor;
+    $('#faktor').value = fmt(num(state.faktor), 2); $('#co2Faktor').value = state.co2Faktor;
     tegnResultat();
   });
 
@@ -2911,6 +3049,7 @@ function bind() {
   });
 
   $('#gemScenarie').addEventListener('click', () => {
+    if (valider().length || !(beregn().total > 0)) return;
     const r = beregn(), arr = hentScenarier();
     if (!aktivCase) aktivCase = caseNavnFraFiler() || state.caseNavn || 'Beregning';
     arr.push({ navn: state.caseNavn || 'Uden navn', case: aktivCase, mode: MODES[state.mode].navn, vaegt: r.fragtpligtig, total: r.total,
@@ -2950,7 +3089,13 @@ function bind() {
   ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
   drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) haandterFiler(Array.from(e.dataTransfer.files)); });
 
-  $('#gemCase').addEventListener('click', gemDenneCase);
+  $('#gemCase').addEventListener('click', () => gemDenneCase());
+  $('#gemBekraeft').addEventListener('click', () => gemDenneCase($('#gemNavn').value));
+  $('#gemAnnuller').addEventListener('click', () => $('#gemDialog').classList.add('hidden'));
+  $('#gemNavn').addEventListener('keydown', e => {
+    if (e.key === 'Enter') gemDenneCase($('#gemNavn').value);
+    if (e.key === 'Escape') $('#gemDialog').classList.add('hidden');
+  });
   document.addEventListener('click', e => {
     if (!e.target.closest || !e.target.closest('#kopierKonklusion')) return;
     const t = $('#konklusionTekst');
@@ -3002,7 +3147,10 @@ function bind() {
   $('#fundListe').addEventListener('change', e => {
     if (!e.target.classList.contains('fundCheck')) return;
     const id = e.target.closest('[data-id]').dataset.id;
-    const f = fund.find(x => x.id === id); if (f) f.valgt = e.target.checked;
+    const f = fund.find(x => x.id === id); if (!f) return;
+    f.valgt = e.target.checked;
+    // Alternativer som to lastbilruter er et enten-eller: vaelges den ene, fravaelges den anden
+    if (f.alternativ && f.valgt) { fund.forEach(x => { if (x !== f && x.altGruppe === f.altGruppe) x.valgt = false; }); tegnFund(); }
   });
   $('#opdeling').addEventListener('change', e => {
     if (e.target.name !== 'opdeling') return;
