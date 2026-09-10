@@ -60,8 +60,15 @@
     </div>
     <div class="mt-3 flex items-start gap-3">
       <div id="filListe" class="flex-1 space-y-1 text-sm"></div>
+      <button id="gemCase" class="text-xs bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg whitespace-nowrap">Gem case</button>
       <button id="rydFiler" class="text-xs bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg whitespace-nowrap">Ryd alt</button>
     </div>
+  </div>
+
+  <div class="card p-4" id="gemteBoks">
+    <h2 class="font-semibold mb-1">Gemte cases</h2>
+    <p class="text-xs text-slate-400 mb-3">Der gemmes kun når du selv trykker Gem case. Alt ligger i denne browser på denne computer, ikke nogen steder online.</p>
+    <div id="gemteListe"></div>
   </div>
 
   <div class="card p-4">
@@ -1001,6 +1008,91 @@ function tegnMuligheder() {
         (billigst ? ' <span class="text-emerald-400">billigst</span>' : '') + '</div>' +
         '<div class="text-[11px] text-slate-400">' + fmt(x.total) + ' DKK</div></button>';
     }).join('') + '</div>';
+}
+
+
+// ============================================================
+//  Gemte cases. Der gemmes kun paa knappen, aldrig af sig selv.
+// ============================================================
+const GEMTE_NOEGLE = 'fragt_gemte_cases';
+const MAX_TEKST = 400000;   // tegn pr. case, saa browserens plads ikke loeber fuld
+
+function hentGemteCases() { try { return JSON.parse(localStorage.getItem(GEMTE_NOEGLE) || '[]'); } catch (e) { return []; } }
+function skrivGemteCases(a) {
+  try { localStorage.setItem(GEMTE_NOEGLE, JSON.stringify(a)); return true; }
+  catch (e) { alert('Der er ikke plads til flere gemte cases i browseren. Slet en af de gamle først.'); return false; }
+}
+
+function gemDenneCase() {
+  if (!fund.length && !samletTekst.trim()) { alert('Der er ikke noget at gemme endnu. Upload en case først.'); return; }
+  const forslag = (samletTekst.match(/=====\s*(.+?)\s*=====/) || [])[1] || 'Case ' + new Date().toLocaleDateString('da-DK');
+  const navn = prompt('Hvad skal casen hedde?', forslag);
+  if (navn === null) return;
+  const rent = String(navn).trim() || forslag;
+
+  const arr = hentGemteCases();
+  const findes = arr.findIndex(x => x.navn === rent);
+  if (findes >= 0 && !confirm('Der findes allerede en case der hedder ' + rent + '. Skal den overskrives?')) return;
+
+  const post = {
+    navn: rent,
+    dato: new Date().toISOString(),
+    tekst: samletTekst.slice(0, MAX_TEKST),
+    afkortet: samletTekst.length > MAX_TEKST,
+    fund: fund,
+    afsnit: afsnitListe,
+    opdeling: opdelingTilstand,
+    scenarier: hentScenarier()
+  };
+  if (findes >= 0) arr[findes] = post; else arr.push(post);
+  if (!skrivGemteCases(arr)) return;
+  tegnGemteCases();
+  const b = $('#gemCase'), t = b.textContent;
+  b.textContent = 'Gemt ✔';
+  setTimeout(() => { b.textContent = t; }, 1400);
+}
+
+function aabnGemtCase(i) {
+  const arr = hentGemteCases();
+  const c = arr[i];
+  if (!c) return;
+  if ((fund.length || hentScenarier().length) && !confirm('Åbn ' + c.navn + '? Det du arbejder på nu bliver erstattet.')) return;
+  samletTekst = c.tekst || '';
+  fund = c.fund || [];
+  afsnitListe = c.afsnit || [];
+  opdelingTilstand = c.opdeling || 'auto';
+  gemScenarier(c.scenarier || []);
+  $('#filListe').innerHTML = '<div class="text-slate-300 text-sm">Hentet fra gemte cases: ' + esc(c.navn) +
+    (c.afkortet ? ' <span class="text-amber-300 text-[11px]">(teksten var for lang og blev afkortet, da den blev gemt)</span>' : '') + '</div>';
+  $('#tekstDump').textContent = samletTekst.slice(0, 60000);
+  tegnFund();
+  const sc = c.scenarier || [];
+  if (sc.length) { state = JSON.parse(JSON.stringify(sc[0].state)); fyldFormular(); }
+  tegnSammenlign();
+  tegnGemteCases();
+}
+
+function tegnGemteCases() {
+  const boks = $('#gemteListe');
+  if (!boks) return;
+  const arr = hentGemteCases();
+  if (!arr.length) {
+    boks.innerHTML = '<div class="text-sm text-slate-400">Ingen gemte cases endnu. Upload en case og tryk Gem case, så kan du hente den frem igen senere.</div>';
+    return;
+  }
+  boks.innerHTML = '<div class="space-y-2">' + arr.map((c, i) => {
+    const d = new Date(c.dato);
+    const dato = isNaN(d) ? '' : d.toLocaleDateString('da-DK') + ' kl. ' + d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+    const muligheder = (c.scenarier || []).length;
+    return '<div class="flex flex-wrap items-center gap-3 border border-[#1e2836] rounded-xl p-3">' +
+      '<div class="flex-1 min-w-[180px]">' +
+      '<div class="text-sm font-medium">' + esc(c.navn) + '</div>' +
+      '<div class="text-[11px] text-slate-500">' + esc(dato) + ' &middot; ' + (c.fund || []).length + ' fund' +
+      (muligheder ? ' &middot; ' + muligheder + ' beregnede muligheder' : '') + '</div></div>' +
+      '<button class="aabnCase text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg font-medium" data-i="' + i + '">Åbn</button>' +
+      '<button class="sletCase text-slate-500 hover:text-red-400 px-2" data-i="' + i + '" title="Slet">&#10005;</button>' +
+      '</div>';
+  }).join('') + '</div>';
 }
 
 // ============================================================
@@ -2370,6 +2462,20 @@ function bind() {
   ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
   drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) haandterFiler(Array.from(e.dataTransfer.files)); });
 
+  $('#gemCase').addEventListener('click', gemDenneCase);
+  $('#gemteListe').addEventListener('click', e => {
+    const a = e.target.closest('.aabnCase'), d = e.target.closest('.sletCase');
+    if (a) { aabnGemtCase(+a.dataset.i); return; }
+    if (d) {
+      const arr = hentGemteCases();
+      const c = arr[+d.dataset.i];
+      if (!c || !confirm('Slet den gemte case ' + c.navn + '?')) return;
+      arr.splice(+d.dataset.i, 1);
+      skrivGemteCases(arr);
+      tegnGemteCases();
+    }
+  });
+
   $('#rydFiler').addEventListener('click', () => {
     if (fund.length && !confirm('Ryd alle uploadede filer og fundne værdier? Dine gemte muligheder under Sammenlign bevares.')) return;
     fund = []; afsnitListe = []; samletTekst = ''; opdelingTilstand = 'auto';
@@ -2415,6 +2521,7 @@ function fallbackKopi(txt, ok) {
 
 bind();
 tegnFund();
+tegnGemteCases();
 // Browseren kan genskabe gamle feltvaerdier efter en genindlaesning.
 // Naar siden vises, skrives alt derfor tilbage fra beregningen selv.
 window.addEventListener('pageshow', () => {

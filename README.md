@@ -23,6 +23,10 @@ standardkurs uden at nævne det.
 Fund der er usikre, er markeret og fravalgt på forhånd. Finder siden flere forskellige værdier for det samme,
 fx fem transporttider fordi casen stiller fem tilbud op mod hinanden, markeres de, og kun den første er valgt.
 
+Har du løst en case, kan du gemme den med knappen Gem case. Teksten, de fundne værdier og alle
+beregnede muligheder gemmes samlet, så du kan hente dem frem igen. Der gemmes kun når du selv trykker,
+aldrig automatisk, og alt bliver i din egen browser.
+
 **2. Beregning**
 - Rumfang ud fra kollienes mål, eller m³ skrevet direkte
 - Fragtpligtig vægt efter w/m-reglen med redigerbar omregningsfaktor
@@ -43,11 +47,6 @@ leveringssikkerhed og CO2. Vægtet pointmodel hvor man selv sætter kriteriernes
 
 **Teori**
 w/m-faktorer, break-point, ordbog over tillæg, kriterier for valg af transportform og CO2-faktorer.
-
-## Indbyggede cases
-
-Air Birgers Møbler, Sea Birgers Møbler (tre transportmuligheder) og DanMeat kan indlæses direkte fra menuen
-øverst og bruges som eksempel eller kontrol.
 
 ## Kilder
 
