@@ -36,8 +36,8 @@
     </div>
   </div>
   <div class="max-w-6xl mx-auto px-4 flex gap-1 text-sm overflow-x-auto">
-    <button data-tab="case" class="tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap">1. Case &amp; bilag</button>
-    <button data-tab="beregner" class="tabbtn px-3 py-2 border-b-2 border-blue-500 text-white whitespace-nowrap">2. Beregning</button>
+    <button data-tab="case" class="tabbtn px-3 py-2 border-b-2 border-blue-500 text-white whitespace-nowrap">1. Case &amp; bilag</button>
+    <button data-tab="beregner" class="tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap">2. Beregning</button>
     <button data-tab="vurdering" class="tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap">3. Nøgletal &amp; vurdering</button>
     <button data-tab="sammenlign" class="tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap">4. Sammenlign</button>
     <button data-tab="teori" class="tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap">Teori</button>
@@ -47,7 +47,7 @@
 <main class="max-w-6xl mx-auto px-4 py-5 space-y-5">
 
 <!-- ============ 1. CASE & BILAG ============ -->
-<section id="tab-case" class="hidden space-y-5">
+<section id="tab-case" class="space-y-5">
   <div class="card p-4">
     <h2 class="font-semibold mb-1">Upload case og bilag</h2>
     <p class="text-xs text-slate-400 mb-3">
@@ -97,7 +97,7 @@
 </section>
 
 <!-- ============ 2. BEREGNER ============ -->
-<section id="tab-beregner" class="space-y-5">
+<section id="tab-beregner" class="hidden space-y-5">
 
   <div class="card p-4">
     <div class="flex flex-wrap items-center gap-3">
@@ -2512,8 +2512,9 @@ function fallbackKopi(txt, ok) {
 
 bind();
 tegnFund();
-state = PRESETS.airBirgers.lav();
-$('#presetVaelger').value = 'airBirgers';
+// Start med en tom beregning. Eksempelcasene ligger i menuen oeverst.
+state = tomState();
+$('#presetVaelger').value = 'tom';
 fyldFormular();
 </script>
 </body>
