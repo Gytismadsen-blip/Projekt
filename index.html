@@ -98,6 +98,7 @@
     <div class="flex flex-wrap items-center gap-3">
       <label class="text-sm text-slate-400">Navn på beregning</label>
       <input id="caseNavn" class="flex-1 min-w-[200px]" placeholder="fx Air Birgers Møbler, mulighed 1">
+      <button id="beregnKnap" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded-lg font-medium text-sm">Beregn</button>
       <label class="text-sm text-slate-400">Antal forsendelser</label>
       <input id="antalForsendelser" class="num w-20" value="1">
     </div>
@@ -263,6 +264,10 @@
       </div>
     </div>
     <div id="resultat" class="scroll"></div>
+
+    <h3 class="font-semibold mt-6 mb-1">Sådan er det regnet</h3>
+    <p class="text-xs text-slate-400 mb-3">Hvert trin med tallene sat ind, så du kan skrive udregningen direkte af.</p>
+    <div id="formler" class="space-y-3"></div>
   </div>
 </section>
 
@@ -287,6 +292,10 @@
 <!-- ============ 4. SAMMENLIGN ============ -->
 <section id="tab-sammenlign" class="hidden space-y-4">
   <div class="card p-4">
+    <h2 class="font-semibold mb-1">Konklusion</h2>
+    <p class="text-xs text-slate-400 mb-3">Hvilken mulighed er billigst, og hvad taler for og imod. Citaterne er hentet ordret fra casen.</p>
+    <div id="konklusion" class="space-y-2 mb-6"></div>
+
     <h2 class="font-semibold mb-1">Beslutningsgrundlag</h2>
     <p class="text-xs text-slate-400 mb-3">Gem flere muligheder på fanen Beregning, og sammenlign dem her på pris, tid, service og CO2.</p>
     <div id="sammenlignBoks" class="scroll"></div>
@@ -731,6 +740,7 @@ function tegnResultat() {
   $('#resultat').innerHTML = h;
 
   tegnVurdering(r);
+  tegnFormler(r);
 }
 
 function kpi(label, vaerdi, note) {
@@ -880,19 +890,21 @@ function tegnSammenlign() {
   if (!arr.length) {
     $('#sammenlignBoks').innerHTML = '<div class="text-sm text-slate-400">Ingen muligheder gemt endnu. Lav en beregning og tryk "Gem som mulighed".</div>';
     $('#pointBoks').innerHTML = '';
+    if ($('#konklusion')) $('#konklusion').innerHTML = '<div class="text-sm text-slate-400">Gem mindst to muligheder, så skrives konklusionen her.</div>';
     return;
   }
   const minPris = Math.min.apply(null, arr.map(a => a.total));
   let h = '<table class="text-sm w-full min-w-[860px]"><thead class="text-slate-400 text-xs uppercase"><tr>' +
-    '<th class="text-left">Mulighed</th><th class="text-left">Form</th><th class="text-right">Fragtpl. vægt</th><th class="text-right">Fragt DKK</th>' +
+    '<th class="text-left">Mulighed</th><th class="text-left">Form</th><th class="text-right">m³</th><th class="text-right">Fragt DKK</th>' +
     '<th class="text-right">Merpris</th><th class="text-right">Kapitalbind.</th><th class="text-right">Total DKK</th>' +
     '<th class="text-right">Tid</th><th class="text-right">Afg./md</th><th class="text-right">Sikkerh.</th><th class="text-right">CO2 kg</th><th></th></tr></thead><tbody class="divide-y divide-[#1e2836]">';
   arr.forEach((a, i) => {
     const b = Math.abs(a.total - minPris) < 0.005;
     h += '<tr class="' + (b ? 'bg-emerald-950/40' : '') + '">' +
-      '<td class="font-medium">' + esc(a.navn) + (b ? ' <span class="text-emerald-400 text-xs">billigst fragt</span>' : '') + '</td>' +
+      '<td class="font-medium">' + esc(a.navn) + (b ? ' <span class="text-emerald-400 text-xs">billigst fragt</span>' : '') +
+        (a.beskrivelse ? '<div class="text-[11px] text-slate-500 font-normal max-w-[280px] truncate">' + esc(a.beskrivelse) + '</div>' : '') + '</td>' +
       '<td class="text-slate-400">' + esc(a.mode) + '</td>' +
-      '<td class="num">' + fmt(a.vaegt) + '</td>' +
+      '<td class="num">' + (num(a.volumen) > 0 ? fmt(num(a.volumen), 1) : '&ndash;') + '</td>' +
       '<td class="num font-semibold">' + fmt(a.total) + '</td>' +
       '<td class="num text-slate-400">' + (b ? '&ndash;' : '+' + fmt(a.total - minPris)) + '</td>' +
       '<td class="num text-slate-400">' + fmt(a.kapital || 0) + '</td>' +
@@ -906,6 +918,7 @@ function tegnSammenlign() {
   h += '</tbody></table>';
   $('#sammenlignBoks').innerHTML = h;
   tegnPoint(arr);
+  tegnKonklusion(arr);
 }
 
 function tegnPoint(arr) {
@@ -943,6 +956,181 @@ function tegnPoint(arr) {
   const best = totaler.length ? totaler.indexOf(Math.max.apply(null, totaler)) : -1;
   if (best >= 0) h += '<div class="mt-3 text-sm text-emerald-300">Højeste point med de valgte vægte: <span class="font-semibold">' + esc(arr[best].navn) + '</span>. Modellen er kun så god som dine vægte — begrund dem i din analyse.</div>';
   $('#pointBoks').innerHTML = h;
+}
+
+
+// ============================================================
+//  Udregningen trin for trin
+// ============================================================
+function byggFormler(r) {
+  const s = state, trin = [];
+  const t = (titel, linjer, svar) => trin.push({ titel: titel, linjer: linjer.filter(x => x), svar: svar });
+
+  // 1. rumfang
+  if (s.inputType === 'kolli') {
+    const l = s.kolli.filter(k => num(k.l) * num(k.b) * num(k.h) > 0).map(k => {
+      const stk = num(k.antal), en = num(k.l) * num(k.b) * num(k.h);
+      return fmt(stk, 0) + ' stk. ' + fmt(num(k.l), 0) + ' × ' + fmt(num(k.b), 0) + ' × ' + fmt(num(k.h), 0) + ' cm' +
+        '  =  ' + fmt(stk, 0) + ' × ' + fmt(en, 0) + ' cm³  =  ' + fmt(stk * en, 0) + ' cm³';
+    });
+    l.push('I alt ' + fmt(r.volumen * 1000000, 0) + ' cm³ ÷ 1.000.000');
+    t('1. Rumfang', l, fmt(r.volumen, 4) + ' m³');
+  } else {
+    t('1. Rumfang', ['Indtastet direkte'], fmt(r.volumen, 4) + ' m³');
+  }
+
+  // 2. volumenvaegt
+  t('2. Volumenvægt', [
+    'Rumfanget ganges med omregningsfaktoren for ' + MODES[s.mode].navn.toLowerCase(),
+    fmt(r.volumen, 4) + ' m³ × ' + fmt(num(s.faktor), 2) + ' kg/m³  =  ' + fmt(r.volumenVaegt, 2) + ' kg' +
+      (s.afrunding === 'ingen' ? '' : ' (rundes op)')
+  ], fmt(r.volumenVaegt, 2) + ' kg');
+
+  // 3. fragtpligtig vaegt
+  t('3. Fragtpligtig vægt', [
+    'Der betales for det største: den faktiske vægt eller volumenvægten',
+    'Faktisk vægt ' + fmt(r.faktiskVaegt) + ' kg  mod  volumenvægt ' + fmt(r.volumenVaegt, 2) + ' kg',
+    r.styrende === 'rumfanget' ? 'Rumfanget er størst, så det styrer prisen' : 'Vægten er størst, så den styrer prisen'
+  ], fmt(r.fragtpligtig) + ' kg');
+
+  // 4. grundfragt
+  if (s.fragtType === 'trappe' && r.kandidater.length) {
+    const l = r.kandidater.map(k =>
+      fmt(k.vaegt) + ' kg × ' + fmt(k.sats, 2) + ' ' + s.valutaFragt + '/kg  =  ' + fmt(k.belob, 2) + ' ' + s.valutaFragt +
+      '   (klasse Q' + fmt(k.fra, 0) + ')' + (k === r.valgt ? '   ← billigst' : ''));
+    if (r.valgt && !r.valgt.egen) l.push('Break-point: der deklareres ' + fmt(r.valgt.vaegt) + ' kg i stedet for ' + fmt(r.fragtpligtig) + ' kg');
+    if (r.minRamt) l.push('Beløbet er under minimumssatsen M, så M gælder');
+    t('4. Valg af vægtklasse', l, fmt(r.grundfragtPrForsendelse, 2) + ' ' + s.valutaFragt);
+  } else if (s.fragtType === 'wm') {
+    t('4. Grundfragt pr. w/m', [
+      'Måleton = fragtpligtig vægt i ton = ' + fmt(r.fragtpligtig) + ' kg ÷ 1.000',
+      fmt(r.maaleton, 3) + ' w/m × ' + fmt(num(s.wmSats), 2) + ' ' + s.valutaFragt + '/w/m'
+    ], fmt(r.grundfragtPrForsendelse, 2) + ' ' + s.valutaFragt);
+  } else {
+    t('4. Grundfragt', ['Fast pris efter tilbuddet'], fmt(r.grundfragtPrForsendelse, 2) + ' ' + s.valutaFragt);
+  }
+
+  // 5. tillaeg
+  if (r.poster.length) {
+    t('5. Tillæg og gebyrer', r.poster.map(pp =>
+      pp.navn + ':  ' + pp.forklaring + '  =  ' + fmt(pp.belob, 2) + ' ' + pp.valuta +
+      (pp.valuta === 'DKK' ? '' : '  =  ' + fmt(pp.dkk, 2) + ' DKK')),
+      fmt(r.tillaegDKK, 2) + ' DKK');
+  }
+
+  // 6. omregning og total
+  const oml = [];
+  oml.push('Grundfragt ' + fmt(r.grundfragtOrig, 2) + ' ' + s.valutaFragt +
+    (s.valutaFragt === 'DKK' ? '' : ' × ' + fmt(r.kurs[s.valutaFragt], 2) + '  =  ' + fmt(r.grundfragtDKK, 2) + ' DKK') +
+    (r.antal > 1 ? '   (' + r.antal + ' forsendelser)' : ''));
+  oml.push('Tillæg og gebyrer  =  ' + fmt(r.tillaegDKK, 2) + ' DKK');
+  t('6. Samlet fragtomkostning', oml, fmt(r.total, 2) + ' DKK');
+
+  if (r.antal > 1) t('7. Pr. forsendelse', [fmt(r.total, 2) + ' DKK ÷ ' + r.antal], fmt(r.total / r.antal, 2) + ' DKK');
+  return trin;
+}
+
+function tegnFormler(r) {
+  const boks = $('#formler');
+  if (!boks) return;
+  boks.innerHTML = byggFormler(r).map(t =>
+    '<div class="border border-[#1e2836] rounded-xl p-3">' +
+    '<div class="flex flex-wrap items-baseline gap-2 mb-1">' +
+    '<span class="font-semibold text-sm text-blue-200">' + esc(t.titel) + '</span>' +
+    '<span class="ml-auto font-semibold text-emerald-300 text-sm">' + esc(t.svar) + '</span></div>' +
+    '<div class="text-[12px] text-slate-300 space-y-0.5 font-mono">' +
+    t.linjer.map(l => '<div>' + esc(l) + '</div>').join('') + '</div></div>').join('');
+}
+
+// ============================================================
+//  Konklusion paa sammenligningen
+// ============================================================
+const CITAT_ORD = [
+  [/no guarantee|ingen garanti/i, 4], [/guarantee|garanti/i, 3],
+  [/prolonged|forl(?:æ|ae)nget|delay|forsink/i, 3], [/space available|plads/i, 3],
+  [/very popular|meget popul(?:æ|ae)r/i, 2], [/every week|every second week|hver uge|hver anden uge/i, 2],
+  [/transporttime|transport time|transporttid/i, 2], [/vary|varier/i, 2],
+  [/direct|direkte/i, 1], [/at the latest|senest/i, 2]
+];
+
+// Finder den saetning i casens egen tekst, der siger mest om valget
+function casecitat(prosa) {
+  if (!prosa) return '';
+  const saetninger = String(prosa).split(/(?<=[.!?])\s+/).map(x => x.trim())
+    .filter(x => x.length > 35 && x.length < 260 && !/^(USD|DKK|EUR)\s*[–\-:]/i.test(x));
+  let bedst = '', point = 0;
+  saetninger.forEach(x => {
+    let p = 0;
+    CITAT_ORD.forEach(o => { if (o[0].test(x)) p += o[1]; });
+    if (p > point) { point = p; bedst = x; }
+  });
+  return point > 0 ? bedst : (saetninger[0] || '');
+}
+
+function tegnKonklusion(arr) {
+  const boks = $('#konklusion');
+  if (!boks) return;
+  if (arr.length < 2) {
+    boks.innerHTML = '<div class="text-sm text-slate-400">Gem mindst to muligheder, så skrives konklusionen her.</div>';
+    return;
+  }
+  const kort = navn => String(navn).length > 46 ? String(navn).slice(0, 44).trim() + '…' : String(navn);
+  const billigst = arr.reduce((a, b) => b.total < a.total ? b : a);
+  const dyrest = arr.reduce((a, b) => b.total > a.total ? b : a);
+  const rest = arr.filter(x => x !== billigst).sort((a, b) => a.total - b.total);
+
+  const saetninger = [];
+  saetninger.push({ type: 'ok', txt: kort(billigst.navn) + ' er den billigste med ' + fmt(billigst.total) + ' DKK, hvilket er ' +
+    fmt(rest[0].total - billigst.total) + ' DKK under ' + kort(rest[0].navn) + ' og ' +
+    fmt(dyrest.total - billigst.total) + ' DKK under den dyreste.' });
+
+  const medVol = arr.filter(x => num(x.volumen) > 0);
+  if (medVol.length === arr.length) {
+    const prM3 = medVol.map(x => ({ navn: x.navn, v: x.total / num(x.volumen) })).sort((a, b) => a.v - b.v);
+    saetninger.push({ type: 'info', txt: 'Regnet pr. m³ er ' + kort(prM3[0].navn) + ' billigst med ' + fmt(prM3[0].v) +
+      ' DKK pr. m³, mod ' + fmt(prM3[prM3.length - 1].v) + ' DKK pr. m³ for den dyreste. Bruger du ikke hele kapaciteten, betaler du for tom plads.' });
+  }
+
+  const medTid = arr.filter(x => num(x.tid) > 0);
+  if (medTid.length > 1) {
+    const hurtigst = medTid.reduce((a, b) => num(b.tid) < num(a.tid) ? b : a);
+    const langsomst = medTid.reduce((a, b) => num(b.tid) > num(a.tid) ? b : a);
+    if (num(hurtigst.tid) !== num(langsomst.tid)) {
+      saetninger.push({ type: 'info', txt: kort(hurtigst.navn) + ' er hurtigst med ' + fmt(num(hurtigst.tid), 0) +
+        ' dage mod ' + fmt(num(langsomst.tid), 0) + ' dage, og binder derfor mindst kapital undervejs.' });
+    } else {
+      saetninger.push({ type: 'info', txt: 'Transporttiden er den samme for mulighederne, så tiden kan ikke bruges til at skille dem ad. Se i stedet på pris, sikkerhed for levering og hvor meget godset håndteres undervejs.' });
+    }
+  }
+
+  // forsikring
+  const medForsikring = arr.filter(x => (x.state.linjer || []).some(l => l.aktiv && /forsikring|insurance/i.test(l.navn)));
+  if (medForsikring.length === 0) {
+    saetninger.push({ type: 'advarsel', txt: 'Ingen af mulighederne har en forsikringspost. Præmien beregnes normalt af varens værdi plus fragten, så den dyreste transport også giver den højeste præmie. Tag den med, før du vælger.' });
+  } else if (medForsikring.length < arr.length) {
+    saetninger.push({ type: 'advarsel', txt: 'Kun ' + medForsikring.length + ' af ' + arr.length + ' muligheder har forsikring med. Så længe det ikke er ens, kan priserne ikke sammenlignes direkte.' });
+  } else {
+    saetninger.push({ type: 'info', txt: 'Alle muligheder har forsikring med. Da præmien følger varens værdi plus fragten, vokser den i takt med fragtprisen, og den billigste transport er derfor også den billigst forsikrede.' });
+  }
+  const citatBilligst = casecitat(billigst.prosa);
+  const forbehold = /no guarantee|ingen garanti|prolonged|forl(?:æ|ae)nget|delay|forsink|vary|varier/i.test(citatBilligst);
+  saetninger.push({ type: 'ok', txt: 'Anbefaling: vælg ' + kort(billigst.navn) + ', som er billigst med ' + fmt(billigst.total) + ' DKK. ' +
+    (forbehold
+      ? 'Casen tager dog forbehold for netop denne løsning, så du skal kunne leve med den usikkerhed. Kan du ikke det, koster den næstbilligste ' + fmt(rest[0].total - billigst.total) + ' DKK mere om måneden for større sikkerhed.'
+      : 'Der er ikke noget i casen, der taler afgørende imod den, og de øvrige muligheder koster mere uden at give noget bedre igen.') });
+  saetninger.push({ type: 'info', txt: 'Husk håndteringen: samlegods læsses sammen med andre kunders varer og omlades flere gange, mens en hel container plomberes ét sted og åbnes ét sted. Flere omladninger giver større risiko for skade og svind, og transportørens ansvar er beløbsbegrænset.' });
+
+  const farve = { ok: 'border-emerald-800 bg-emerald-950/20', advarsel: 'border-amber-800 bg-amber-950/20', info: 'border-[#1e2836]' };
+  let h = saetninger.map(x => '<div class="border rounded-xl p-3 text-sm text-slate-300 ' + farve[x.type] + '">' + esc(x.txt) + '</div>').join('');
+
+  const medCitat = arr.filter(x => casecitat(x.prosa));
+  if (medCitat.length) {
+    h += '<div class="border border-[#1e2836] rounded-xl p-3 mt-2">' +
+      '<div class="text-xs text-slate-400 mb-2">Sådan beskriver casen selv mulighederne:</div>' +
+      medCitat.map(x => '<div class="mb-2"><div class="text-[11px] text-blue-300">' + esc(kort(x.navn)) + ' &mdash; ' + fmt(x.total) + ' DKK</div>' +
+        '<div class="text-sm text-slate-300 italic">&laquo;' + esc(casecitat(x.prosa)) + '&raquo;</div></div>').join('') + '</div>';
+  }
+  boks.innerHTML = h;
 }
 
 // ============================================================
@@ -1091,6 +1279,18 @@ function containerCase(navn, fragt, baf, feeder, dage) {
 // ============================================================
 let samletTekst = '';
 let fund = [];
+let afsnitListe = [];   // transportmuligheder fundet i casen
+
+// Laegger nye fund oveni de gamle og holder muligheds-numrene adskilt pr. fil
+function tilfoejFund(res, kilde) {
+  const forskyd = afsnitListe.length;
+  (res.afsnit || []).forEach(a => afsnitListe.push({ nr: a.nr + forskyd, navn: a.navn, beskrivelse: a.beskrivelse, prosa: a.prosa, kilde: kilde }));
+  const nye = res.fund.filter(nyt => !fund.some(g => g.type === nyt.type && g.afsnit === nyt.afsnit + (nyt.afsnit ? forskyd : 0) && JSON.stringify(g.data) === JSON.stringify(nyt.data)));
+  nye.forEach(x => { if (x.afsnit) x.afsnit += forskyd; });
+  fund = fund.concat(nye);
+  markerKonflikter(fund);
+  return nye.length;
+}
 
 async function laesFil(file) {
   const navn = file.name.toLowerCase();
@@ -1192,10 +1392,75 @@ async function laesPdf(file) {
 const VAL = '(USD|EUR|DKK|GBP|SEK|NOK|CHF|PLN|CNY|JPY|CAD|AUD|kr|\\$|€|£)';
 const N = '(\\d{1,3}(?:\\.\\d{3})+(?:,\\d+)?|\\d{1,3}(?:\\s\\d{3})+(?:[.,]\\d+)?|\\d+(?:[.,]\\d+)?)';
 
+// ------------------------------------------------------------
+//  Opdeling af casen i transportmuligheder
+//  En case stiller tit flere tilbud op mod hinanden. Satserne hoerer
+//  til hver sin mulighed og maa ikke blandes sammen i én beregning.
+// ------------------------------------------------------------
+const PRIS_LINJE = /^[ \t]*(USD|EUR|DKK|GBP|SEK|NOK|CHF|PLN|CNY)[ \t]*[–\-:]/i;
+const MULIGHED_OVERSKRIFT = /^[ \t]*(?:option|mulighed|tilbud|offer|alternativ|forslag|løsning|variant|scenario|forslag)[ \t:.#\-]*(\d{1,2}|[A-Fa-f])\b/i;
+
+function findAfsnit(tekst) {
+  const blokke = [];
+  let pos = 0;
+  tekst.split(/\n[ \t]*\n/).forEach(b => {
+    const start = tekst.indexOf(b, pos);
+    blokke.push({ tekst: b, start: start, slut: start + b.length });
+    pos = start + b.length;
+  });
+
+  // 1. blokke med egentlige prislinjer, fx "USD - freight 1600, CAF 6%"
+  let valgte = blokke.filter(b => b.tekst.split('\n').some(l => PRIS_LINJE.test(l)));
+  // 2. ellers blokke med en tydelig overskrift som "Option 2" eller "Mulighed 2"
+  if (valgte.length < 2) valgte = blokke.filter(b => b.tekst.split('\n').some(l => MULIGHED_OVERSKRIFT.test(l)));
+  if (valgte.length < 2) return [];
+
+  return valgte.map((b, i) => {
+    const foersteProsa = b.tekst.split('\n').find(l => l.trim() && !PRIS_LINJE.test(l)) || b.tekst.split('\n')[0];
+    let navn = (foersteProsa.match(/[^.!?]{5,90}[.!?]?/) || [foersteProsa])[0].trim();
+    if (navn.length > 80) navn = navn.slice(0, 77).trim() + '…';
+    return { nr: i + 1, navn: 'Mulighed ' + (i + 1), beskrivelse: navn, prosa: b.tekst.trim(), start: b.start, slut: b.slut };
+  });
+}
+
+// Casen lister tit maengderne samlet til sidst, én linje pr. mulighed, fx
+//   8 m3 on 4 monthly transports
+//   1 stk. 20" container
+//   1 stk. 40" container
+// Er der lige saa mange linjer som muligheder, hoerer linje 1 til mulighed 1 og saa fremdeles.
+function findMaengdeListe(tekst, afsnit) {
+  if (afsnit.length < 2) return [];
+  const CONTAINER_M3 = { '20': 33, '40': 67, '45': 86 };
+  const ud = [];
+  let pos = 0;
+  tekst.split(/\n[ \t]*\n/).forEach(blok => {
+    const start = tekst.indexOf(blok, pos); pos = start + blok.length;
+    if (afsnit.some(a => start >= a.start && start < a.slut)) return;   // selve muligheden
+    const linjer = blok.split('\n').map(l => l.trim()).filter(l => l);
+    if (linjer.length !== afsnit.length) return;
+    const maengder = linjer.map(l => {
+      const c = l.match(/(?:(\d{1,3})\s*(?:stk\.?|x|×|pcs?\.?)?\s*)?(20|40|45)\s*(?:["”“'’]|-?\s*(?:foot|feet|fods|fod|ft)\b)/i);
+      const v = l.match(/(\d+(?:[.,]\d+)?)\s*(?:m3|m³|cbm)(?![a-z0-9])/i);
+      if (!c && !v) return null;
+      const gentag = l.match(/(\d{1,3})\s*(?:monthly|m(?:å|aa)nedlige|ugentlige|weekly|)\s*(?:transports?|forsendelser|shipments?|afgange?)/i);
+      if (c) {
+        const antalC = c[1] ? parseInt(c[1], 10) : 1;
+        return { m3: antalC * (CONTAINER_M3[c[2]] || 33), antalKolli: antalC, gentag: gentag ? parseInt(gentag[1], 10) : 1, tekst: l };
+      }
+      return { m3: num(v[1]), antalKolli: 0, gentag: gentag ? parseInt(gentag[1], 10) : 1, tekst: l };
+    });
+    if (maengder.some(x => !x)) return;
+    maengder.forEach((mg, i) => ud.push({ afsnit: afsnit[i].nr, maengde: mg, pos: start }));
+  });
+  return ud;
+}
+
 function findVaerdier(tekst) {
   const t = tekst.replace(/ /g, ' ').replace(/[ \t]+/g, ' ');
   const f = [];
   const set = new Set();
+  const afsnit = findAfsnit(t);
+  const afsnitFor = pos => { const a = afsnit.find(y => pos >= y.start && pos < y.slut); return a ? a.nr : 0; };
   const brugt = [];   // tekststykker som et praecist moenster allerede har taget
   function reserver(m) { brugt.push([m.index, m.index + m[0].length]); }
   function erBrugt(m) { return brugt.some(b => m.index < b[1] && (m.index + m[0].length) > b[0]); }
@@ -1206,7 +1471,8 @@ function findVaerdier(tekst) {
     return mm ? mm[1].toUpperCase() : '';
   }
   function push(o) {
-    const n = o.type + '|' + JSON.stringify(o.data);
+    o.afsnit = afsnitFor(o.pos === undefined ? -1 : o.pos);
+    const n = o.afsnit + '|' + o.type + '|' + JSON.stringify(o.data);
     if (set.has(n)) return;
     set.add(n);
     o.id = uid(); o.valgt = !o.usikker;
@@ -1227,7 +1493,7 @@ function findVaerdier(tekst) {
     if (l > 2000 || br > 2000 || h > 2000) continue;
     const stk = antal ? parseInt(antal, 10) : 1;
     if (stk > 100000) continue;
-    push({ type: 'kolli', label: stk + ' kolli à ' + fmt(l, 0) + '×' + fmt(br, 0) + '×' + fmt(h, 0) + ' cm',
+    push({ pos: m.index, type: 'kolli', label: stk + ' kolli à ' + fmt(l, 0) + '×' + fmt(br, 0) + '×' + fmt(h, 0) + ' cm',
            vaerdi: fmt(stk * l * br * h / 1000000, 4) + ' m³', kilde: m[0].trim(),
            data: { antal: stk, l: l, b: br, h: h } });
   }
@@ -1237,25 +1503,30 @@ function findVaerdier(tekst) {
   while ((m = vRe.exec(t)) !== null) {
     let v = num(m[1]);
     if (/^t/i.test(m[2])) v *= 1000;
-    if (v > 0 && v < 5000000) push({ type: 'vaegt', label: 'Bruttovægt', vaerdi: fmt(v) + ' kg', kilde: m[0].trim(), data: { vaegt: v } });
+    if (v > 0 && v < 5000000) push({ pos: m.index, type: 'vaegt', label: 'Bruttovægt', vaerdi: fmt(v) + ' kg', kilde: m[0].trim(), data: { vaegt: v } });
   }
   const vRe2 = new RegExp(N + '\\s*kg\\.?\\s*(?:i\\s*alt|in\\s*total|total|brutto)', 'gi');
   while ((m = vRe2.exec(t)) !== null) {
     const v = num(m[1]);
-    if (v > 0) push({ type: 'vaegt', label: 'Bruttovægt', vaerdi: fmt(v) + ' kg', kilde: m[0].trim(), data: { vaegt: v } });
+    if (v > 0) push({ pos: m.index, type: 'vaegt', label: 'Bruttovægt', vaerdi: fmt(v) + ' kg', kilde: m[0].trim(), data: { vaegt: v } });
   }
 
   // --- Q-satser ---
   // Valutaen kan staa foer eller efter satsen: "Q100 EUR 5.11" og "Q 100 2,90 USD pr. kg"
   const qRe = new RegExp('\\bQ\\s*(\\d{1,4})\\s*[:\\-]?\\s*(?:' + VAL + '\\s*)?' + N + '\\s*' + VAL + '?', 'gi');
   const tiers = [];
+  let tierPos = -1;
   while ((m = qRe.exec(t)) !== null) {
     const fra = parseInt(m[1], 10), sats = num(m[3]);
-    if (sats > 0 && sats < 1000 && fra >= 0 && fra <= 10000) { reserver(m); tiers.push({ fra: fra, sats: sats, val: m[2] || m[4] }); }
+    if (sats > 0 && sats < 1000 && fra >= 0 && fra <= 10000) {
+      reserver(m);
+      if (tierPos < 0) tierPos = m.index;
+      tiers.push({ fra: fra, sats: sats, val: m[2] || m[4] });
+    }
   }
   if (tiers.length) {
     const val = valutaAf(tiers.find(x => x.val) ? tiers.find(x => x.val).val : '');
-    push({ type: 'tiers', label: 'Vægtklasser (Q-satser)',
+    push({ pos: tierPos, type: 'tiers', label: 'Vægtklasser (Q-satser)',
            vaerdi: tiers.map(x => 'Q' + x.fra + ': ' + fmt(x.sats, 2)).join(' · ') + (val ? ' ' + val : ''),
            kilde: 'trappesats', data: { tiers: tiers.map(x => ({ fra: x.fra, sats: x.sats })), valuta: val || 'USD' } });
   }
@@ -1266,7 +1537,7 @@ function findVaerdier(tekst) {
   while ((m = mRe.exec(t)) !== null) {
     if (erBrugt(m)) continue;
     const v = num(m[2]), val = valutaAf(m[1] || m[3]);
-    if (v > 0 && val) { reserver(m); push({ type: 'minFragt', label: 'Minimumssats M', vaerdi: fmt(v) + ' ' + val, kilde: m[0].trim(), data: { min: v, valuta: val } }); }
+    if (v > 0 && val) { reserver(m); push({ pos: m.index, type: 'minFragt', label: 'Minimumssats M', vaerdi: fmt(v) + ' ' + val, kilde: m[0].trim(), data: { min: v, valuta: val } }); }
   }
 
   // --- tillæg pr. kg ---
@@ -1275,7 +1546,7 @@ function findVaerdier(tekst) {
     const v = num(m[3]);
     const sVal = valutaAf(m[2] || m[4]) || linjeValuta(m.index) || 'USD';
     if (v > 0 && v < 500) reserver(m);
-    if (v > 0 && v < 500) push({ type: 'linje', label: navnFor(m[1]), vaerdi: fmt(v, 2) + ' ' + sVal + ' pr. kg', kilde: m[0].trim(),
+    if (v > 0 && v < 500) push({ pos: m.index, type: 'linje', label: navnFor(m[1]), vaerdi: fmt(v, 2) + ' ' + sVal + ' pr. kg', kilde: m[0].trim(),
       data: { navn: navnFor(m[1]), type: 'kg', valuta: sVal, sats: v } });
   }
 
@@ -1283,7 +1554,7 @@ function findVaerdier(tekst) {
   const wmRe = new RegExp('(?:freight|fragt|rate)\\D{0,15}' + N + '\\s*(?:' + VAL + ')?\\s*w\\s*/\\s*m', 'gi');
   while ((m = wmRe.exec(t)) !== null) {
     const v = num(m[1]);
-    if (v > 0) push({ type: 'wmFragt', label: 'Grundfragt pr. w/m', vaerdi: fmt(v, 2) + ' pr. w/m', kilde: m[0].trim(), data: { sats: v } });
+    if (v > 0) push({ pos: m.index, type: 'wmFragt', label: 'Grundfragt pr. w/m', vaerdi: fmt(v, 2) + ' pr. w/m', kilde: m[0].trim(), data: { sats: v } });
   }
 
   // --- BAF pr. w/m eller fast ---
@@ -1291,7 +1562,7 @@ function findVaerdier(tekst) {
   while ((m = bafRe.exec(t)) !== null) {
     const v = num(m[1]);
     const bafVal = valutaAf(m[2]) || linjeValuta(m.index) || 'USD';
-    if (v > 0) push({ type: 'linje', label: 'BAF', vaerdi: fmt(v, 2) + ' ' + bafVal + (m[3] ? ' pr. w/m' : ' fast'), kilde: m[0].trim(),
+    if (v > 0) push({ pos: m.index, type: 'linje', label: 'BAF', vaerdi: fmt(v, 2) + ' ' + bafVal + (m[3] ? ' pr. w/m' : ' fast'), kilde: m[0].trim(),
       data: { navn: 'BAF', type: m[3] ? 'wm' : 'fast', valuta: bafVal, sats: v } });
   }
 
@@ -1299,7 +1570,7 @@ function findVaerdier(tekst) {
   const cafRe = new RegExp('\\bCAF\\b\\D{0,12}\\+?\\s*' + N + '\\s*%', 'gi');
   while ((m = cafRe.exec(t)) !== null) {
     const v = num(m[1]);
-    if (v > 0) push({ type: 'linje', label: 'CAF', vaerdi: fmt(v, 2) + ' % af grundfragt', kilde: m[0].trim(),
+    if (v > 0) push({ pos: m.index, type: 'linje', label: 'CAF', vaerdi: fmt(v, 2) + ' % af grundfragt', kilde: m[0].trim(),
       data: { navn: 'CAF ' + fmt(v, 0) + ' %', type: 'pct', sats: v, pctRefs: ['GRUNDFRAGT'] } });
   }
 
@@ -1307,7 +1578,7 @@ function findVaerdier(tekst) {
   const thcRe = new RegExp('\\bTHC\\b\\D{0,12}' + N + '\\s*(?:pr\\.?|per)\\s*100\\s*kg\\.?\\s*[/,]\\s*' + N + '\\s*(?:pr\\.?|per)\\s*(?:cbm|m3|m³)\\s*(?:\\(\\s*min\\.?\\s*' + N + '\\s*\\))?', 'gi');
   while ((m = thcRe.exec(t)) !== null) {
     reserver(m);
-    push({ type: 'linje', label: 'THC', vaerdi: fmt(num(m[1]), 2) + ' pr. 100 kg / ' + fmt(num(m[2]), 2) + ' pr. m³' + (m[3] ? ' (min. ' + fmt(num(m[3])) + ')' : ''), kilde: m[0].trim(),
+    push({ pos: m.index, type: 'linje', label: 'THC', vaerdi: fmt(num(m[1]), 2) + ' pr. 100 kg / ' + fmt(num(m[2]), 2) + ' pr. m³' + (m[3] ? ' (min. ' + fmt(num(m[3])) + ')' : ''), kilde: m[0].trim(),
       data: { navn: 'THC', type: 'thc', valuta: 'DKK', sats: num(m[1]), sats2: num(m[2]), min: m[3] ? num(m[3]) : 0 } });
   }
 
@@ -1317,7 +1588,7 @@ function findVaerdier(tekst) {
     if (erBrugt(m)) continue;                       // THC er allerede taget som dobbeltsats
     const v = num(m[2]);
     const val = valutaAf(m[3]) || linjeValuta(m.index) || 'DKK';
-    if (v > 0 && v < 1000000) push({ type: 'linje', label: m[1].replace(/\s+/g, ' '), vaerdi: fmt(v) + ' ' + val + ' fast', kilde: m[0].trim(),
+    if (v > 0 && v < 1000000) push({ pos: m.index, type: 'linje', label: m[1].replace(/\s+/g, ' '), vaerdi: fmt(v) + ' ' + val + ' fast', kilde: m[0].trim(),
       data: { navn: m[1].replace(/\s+/g, ' '), type: 'fast', valuta: val, sats: v } });
   }
 
@@ -1325,7 +1596,7 @@ function findVaerdier(tekst) {
   const strRe = new RegExp('(?:freight|fragt|trucking|transport)\\s+([A-ZÆØÅ][\\wæøåÆØÅ]*(?:\\s*[–\\-]\\s*[A-ZÆØÅ][\\wæøåÆØÅ]*)+)\\s*(?:is|er|:)?\\s*' + N + '\\s*' + VAL + '', 'gi');
   while ((m = strRe.exec(t)) !== null) {
     const v = num(m[2]);
-    if (v > 0) push({ type: 'linje', label: 'Fragt ' + m[1], vaerdi: fmt(v) + ' ' + (valutaAf(m[3]) || 'DKK'), kilde: m[0].trim(),
+    if (v > 0) push({ pos: m.index, type: 'linje', label: 'Fragt ' + m[1], vaerdi: fmt(v) + ' ' + (valutaAf(m[3]) || 'DKK'), kilde: m[0].trim(),
       data: { navn: 'Fragt ' + m[1].replace(/\s+/g, ' '), type: 'fast', valuta: valutaAf(m[3]) || 'DKK', sats: v } });
   }
 
@@ -1333,7 +1604,7 @@ function findVaerdier(tekst) {
   const fastRe = new RegExp('' + VAL + '\\s*[–\\-]?\\s*freight\\s+' + N + '(?!\\s*(?:w\\s*/\\s*m|pr\\.?|per|/\\s*kg))\\b', 'gi');
   while ((m = fastRe.exec(t)) !== null) {
     const v = num(m[2]);
-    if (v > 0) push({ type: 'fastFragt', label: 'Fast grundfragt', vaerdi: fmt(v) + ' ' + m[1].toUpperCase(), kilde: m[0].trim(), data: { sats: v, valuta: m[1].toUpperCase() } });
+    if (v > 0) push({ pos: m.index, type: 'fastFragt', label: 'Fast grundfragt', vaerdi: fmt(v) + ' ' + m[1].toUpperCase(), kilde: m[0].trim(), data: { sats: v, valuta: m[1].toUpperCase() } });
   }
 
   // --- procenttillæg generelt (fuel fee, honorar, forsikring) ---
@@ -1342,7 +1613,7 @@ function findVaerdier(tekst) {
     const v = num(m[2]);
     if (v > 0 && v <= 100) {
       reserver(m);
-      push({ type: 'linje', label: navnFor(m[1]) + ' ' + fmt(v, 1) + ' %', vaerdi: fmt(v, 2) + ' %', kilde: m[0].trim(),
+      push({ pos: m.index, type: 'linje', label: navnFor(m[1]) + ' ' + fmt(v, 1) + ' %', vaerdi: fmt(v, 2) + ' %', kilde: m[0].trim(),
         data: { navn: navnFor(m[1]) + ' ' + fmt(v, 1) + ' %', type: 'pct', sats: v, pctRefs: pctGrundlagFor(navnFor(m[1])) } });
     }
   }
@@ -1350,7 +1621,7 @@ function findVaerdier(tekst) {
   while ((m = pctRe2.exec(t)) !== null) {
     if (erBrugt(m)) continue;
     const v = num(m[1]);
-    if (v > 0 && v <= 100) push({ type: 'linje', label: navnFor(m[2]) + ' ' + fmt(v, 1) + ' %', vaerdi: fmt(v, 2) + ' %', kilde: m[0].trim(),
+    if (v > 0 && v <= 100) push({ pos: m.index, type: 'linje', label: navnFor(m[2]) + ' ' + fmt(v, 1) + ' %', vaerdi: fmt(v, 2) + ' %', kilde: m[0].trim(),
       data: { navn: navnFor(m[2]) + ' ' + fmt(v, 1) + ' %', type: 'pct', sats: v, pctRefs: pctGrundlagFor(navnFor(m[2])) } });
   }
 
@@ -1364,15 +1635,17 @@ function findVaerdier(tekst) {
     const efter = t.slice(m.index + m[0].length, m.index + m[0].length + 14);
     if (/^\s*(?:pr\.?|per|\/)\s*(?:kg|100|cbm|m3|m³|kolli|stk)|^\s*%|^\s*w\s*\/\s*m/i.test(efter)) continue;
     const navn = m[1].trim().replace(/\s+/g, ' ');
-    push({ type: 'linje', label: navn, vaerdi: fmt(v) + ' ' + val + ' fast', kilde: m[0].trim(), usikker: true,
-      data: { navn: navn.charAt(0).toUpperCase() + navn.slice(1), type: 'fast', valuta: val, sats: v } });
+    const negativ = /kompensation|compensation|rabat|discount|fradrag|godtg(?:ø|oe)relse|refusion|refund/i.test(m[0]);
+    const belob = negativ ? -v : v;
+    push({ pos: m.index, type: 'linje', label: navn, vaerdi: fmt(belob) + ' ' + val + ' fast', kilde: m[0].trim(), usikker: true,
+      data: { navn: navn.charAt(0).toUpperCase() + navn.slice(1), type: 'fast', valuta: val, sats: belob } });
   }
 
   // --- valutakurs ---
   const kRe = new RegExp('1\\s*' + VAL + '\\s*=\\s*' + N + '\\s*(?:DKK|kr)', 'gi');
   while ((m = kRe.exec(t)) !== null) {
     const v = num(m[2]);
-    if (v > 0 && v < 100) push({ type: 'kurs', label: 'Valutakurs 1 ' + m[1].toUpperCase(), vaerdi: fmt(v) + ' DKK', kilde: m[0].trim(), data: { valuta: m[1].toUpperCase(), kurs: v } });
+    if (v > 0 && v < 100) push({ pos: m.index, type: 'kurs', label: 'Valutakurs 1 ' + m[1].toUpperCase(), vaerdi: fmt(v) + ' DKK', kilde: m[0].trim(), data: { valuta: m[1].toUpperCase(), kurs: v } });
   }
   // "The rate of exchange between DKK and EUR is 745.00" og "kurs DKK/USD 600"
   const kRe2 = new RegExp('(?:kurs|(?:rate\\s+of\\s+)?exchange(?:\\s+rate)?)[^\\d]{0,45}?' + VAL + '[^\\d]{0,20}' + N, 'gi');
@@ -1383,33 +1656,46 @@ function findVaerdier(tekst) {
     // "between DKK and EUR" naevner DKK foerst. Vi vil have den anden valuta.
     const koder = (m[0].toUpperCase().match(/\b[A-Z]{3}\b/g) || []).filter(k => k !== 'DKK' && KENDTE_VALUTAER.indexOf(k) >= 0);
     const kode = koder.length ? koder[0] : (valutaAf(m[1]) !== 'DKK' ? valutaAf(m[1]) : '');
-    if (v > 0.5 && v < 100 && kode) push({ type: 'kurs', label: 'Valutakurs 1 ' + kode, vaerdi: fmt(v) + ' DKK', kilde: m[0].trim(), data: { valuta: kode, kurs: v } });
+    if (v > 0.5 && v < 100 && kode) push({ pos: m.index, type: 'kurs', label: 'Valutakurs 1 ' + kode, vaerdi: fmt(v) + ' DKK', kilde: m[0].trim(), data: { valuta: kode, kurs: v } });
   }
 
   // --- vareværdi ---
   const vvRe = new RegExp('(?:v(?:æ|ae)rdi(?:en)?|value)\\D{0,20}' + N + '\\s*' + VAL + '\\D{0,20}(?:pr\\.?|per|hver)\\s*(kasse|carton|box|kolli|stk)', 'gi');
   while ((m = vvRe.exec(t)) !== null) {
     const v = num(m[1]);
-    if (v > 0) { reserver(m); push({ type: 'vareVaerdiPrKolli', label: 'Vareværdi pr. kolli', vaerdi: fmt(v) + ' ' + (valutaAf(m[2]) || 'DKK'), kilde: m[0].trim(), data: { prKolli: v } }); }
+    if (v > 0) { reserver(m); push({ pos: m.index, type: 'vareVaerdiPrKolli', label: 'Vareværdi pr. kolli', vaerdi: fmt(v) + ' ' + (valutaAf(m[2]) || 'DKK'), kilde: m[0].trim(), data: { prKolli: v } }); }
   }
   // "The value per box is DKK 2,000" - enheden staar foer beloebet
   const vvRe3 = new RegExp('(?:v(?:æ|ae)rdi(?:en)?|value)\\s*(?:pr\\.?|per)\\s*(?:kasse|carton|box|kolli|stk|pallet)\\D{0,15}' + VAL + '?\\s*' + N + '\\s*' + VAL + '?', 'gi');
   while ((m = vvRe3.exec(t)) !== null) {
     if (erBrugt(m)) continue;
     const v = num(m[2]);
-    if (v > 0) { reserver(m); push({ type: 'vareVaerdiPrKolli', label: 'Vareværdi pr. kolli', vaerdi: fmt(v) + ' ' + (valutaAf(m[1] || m[3]) || 'DKK'), kilde: m[0].trim(), data: { prKolli: v } }); }
+    if (v > 0) { reserver(m); push({ pos: m.index, type: 'vareVaerdiPrKolli', label: 'Vareværdi pr. kolli', vaerdi: fmt(v) + ' ' + (valutaAf(m[1] || m[3]) || 'DKK'), kilde: m[0].trim(), data: { prKolli: v } }); }
   }
   const vvRe2 = new RegExp('(?:samlet\\s*)?vare?v(?:æ|ae)rdi\\D{0,15}' + N + '\\s*(DKK|kr)', 'gi');
   while ((m = vvRe2.exec(t)) !== null) {
     const v = num(m[1]);
-    if (v > 0) push({ type: 'vareVaerdi', label: 'Vareværdi i alt', vaerdi: fmt(v) + ' DKK', kilde: m[0].trim(), data: { vaerdi: v } });
+    if (v > 0) push({ pos: m.index, type: 'vareVaerdi', label: 'Vareværdi i alt', vaerdi: fmt(v) + ' DKK', kilde: m[0].trim(), data: { vaerdi: v } });
   }
 
   // --- volumen direkte ---
-  const volRe = new RegExp(N + '\\s*(?:m3|m³|cbm)\\b', 'gi');
+  const volRe = new RegExp(N + '\\s*(?:m3|m³|cbm)(?![a-z0-9])', 'gi');
   while ((m = volRe.exec(t)) !== null) {
     const v = num(m[1]);
-    if (v > 0 && v < 100000) push({ type: 'volumen', label: 'Volumen', vaerdi: fmt(v, 3) + ' m³', kilde: m[0].trim(), data: { volumen: v } });
+    if (v > 0 && v < 100000) push({ pos: m.index, type: 'volumen', label: 'Volumen', vaerdi: fmt(v, 3) + ' m³', kilde: m[0].trim(), data: { volumen: v } });
+  }
+
+  // --- containere: "1 stk. 20” container", "one 40 ft container" ---
+  const CONTAINER_M3 = { '20': 33, '40': 67, '45': 86 };
+  const contRe = /(?:(\d{1,3})\s*(?:stk\.?|x|×|pcs?\.?)?\s*)?(20|40|45)\s*(?:["”“'’]|-?\s*(?:foot|feet|fods|fod|ft)\b)\s*(HC\b|high[\s-]*cube)?[^.\n]{0,12}?container/gi;
+  while ((m = contRe.exec(t)) !== null) {
+    const antalC = m[1] ? parseInt(m[1], 10) : 1;
+    let m3 = CONTAINER_M3[m[2]] || 33;
+    if (m[3]) m3 = m[2] === '40' ? 76 : m3;
+    if (antalC < 1 || antalC > 500) continue;
+    push({ pos: m.index, type: 'container', label: antalC + ' × ' + m[2] + '′ container' + (m[3] ? ' HC' : ''),
+      vaerdi: 'ca. ' + fmt(antalC * m3, 0) + ' m³ kapacitet', kilde: m[0].trim(),
+      data: { antal: antalC, size: m[2] + (m[3] ? 'HC' : ''), m3: antalC * m3 } });
   }
 
   // --- transporttid ---
@@ -1417,7 +1703,7 @@ function findVaerdier(tekst) {
   while ((m = tidRe.exec(t)) !== null) {
     let v = num(m[1]);
     if (/ug|week/i.test(m[2])) v *= 7;
-    if (v > 0 && v < 400) { reserver(m); push({ type: 'tid', label: 'Transporttid', vaerdi: fmt(v, 0) + ' dage', kilde: m[0].trim(), data: { dage: v } }); }
+    if (v > 0 && v < 400) { reserver(m); push({ pos: m.index, type: 'tid', label: 'Transporttid', vaerdi: fmt(v, 0) + ' dage', kilde: m[0].trim(), data: { dage: v } }); }
   }
   // "delivered app. 4 weeks later" / "4 uger senere"
   const tidRe2 = new RegExp(N + '\\s*(uger|weeks|uge|week|dage|days)\\s*(?:later|senere|efter)', 'gi');
@@ -1425,18 +1711,47 @@ function findVaerdier(tekst) {
     if (erBrugt(m)) continue;
     let v = num(m[1]);
     if (/ug|week/i.test(m[2])) v *= 7;
-    if (v > 0 && v < 400) push({ type: 'tid', label: 'Transporttid', vaerdi: fmt(v, 0) + ' dage', kilde: m[0].trim(), data: { dage: v } });
+    if (v > 0 && v < 400) push({ pos: m.index, type: 'tid', label: 'Transporttid', vaerdi: fmt(v, 0) + ' dage', kilde: m[0].trim(), data: { dage: v } });
   }
 
+  // knyt hvert fund til den mulighed, det staar i. Alt udenfor gaelder alle muligheder.
+  // maengdelisten til sidst i casen fordeles paa mulighederne i raekkefoelge
+  findMaengdeListe(t, afsnit).forEach(x => {
+    f.push({ id: uid(), valgt: true, pos: x.pos, afsnit: x.afsnit, type: 'maengde',
+      label: 'Mængde', vaerdi: fmt(x.maengde.m3, 0) + ' m³' + (x.maengde.gentag > 1 ? ' × ' + x.maengde.gentag + ' forsendelser' : ''),
+      kilde: x.maengde.tekst, data: x.maengde });
+  });
+  // Staar to beloeb paa samme linje adskilt af "or" eller "eller", er de alternativer.
+  // Begge maa ikke tages med - kun det foerste er sat til.
+  const NL = String.fromCharCode(10);
+  const linjeStart = pos => t.lastIndexOf(NL, pos) + 1;
+  const grupper = {};
+  // Kun poster af samme slags er alternativer. Et procenttillaeg paa samme linje
+  // er et ekstra gebyr, ikke et valg mellem to beloeb.
+  f.filter(x => x.type === 'linje' && x.pos >= 0 && x.data.type !== 'pct').forEach(x => {
+    const st = linjeStart(x.pos), sl = t.indexOf(NL, x.pos);
+    const linje = t.slice(st, sl < 0 ? t.length : sl);
+    if (!/\bor\b|\beller\b/i.test(linje)) return;
+    const noegle = st + '|' + x.data.type;
+    (grupper[noegle] = grupper[noegle] || []).push(x);
+  });
+  Object.keys(grupper).forEach(k => {
+    const g = grupper[k].filter(x => !x.usikker);
+    if (g.length < 2) return;
+    g.forEach((x, i) => { x.alternativ = true; x.valgt = i === 0; });
+  });
+
   markerKonflikter(f);
-  return f;
+  return { fund: f, afsnit: afsnit };
 }
 
 // Nogle felter kan kun have en vaerdi. Findes flere, markeres kun den foerste,
 // saa en case med flere tilbud ikke stille overskriver sig selv.
 function markerKonflikter(liste) {
-  const enkelt = ['vaegt', 'volumen', 'tid', 'tiers', 'minFragt', 'fastFragt', 'wmFragt', 'vareVaerdi', 'vareVaerdiPrKolli'];
-  const noegle = x => x.type === 'kurs' ? 'kurs:' + x.data.valuta : x.type;
+  const enkelt = ['vaegt', 'volumen', 'container', 'tid', 'tiers', 'minFragt', 'fastFragt', 'wmFragt', 'vareVaerdi', 'vareVaerdiPrKolli'];
+  // Konflikt gaelder kun inden for samme mulighed. To fragtsatser i hver sin
+  // mulighed er ikke et valg mellem to tal - de skal begge bruges, hver sit sted.
+  const noegle = x => (x.afsnit || 0) + '|' + (x.type === 'kurs' ? 'kurs:' + x.data.valuta : x.type);
   const antal = {};
   liste.forEach(x => {
     if (enkelt.indexOf(x.type) < 0 && x.type !== 'kurs') return;
@@ -1482,36 +1797,75 @@ function navnFor(s) {
 const FUND_IKON = { kolli: '📦', vaegt: '⚖️', tiers: '📊', minFragt: '📊', linje: '💰', wmFragt: '🚢',
   fastFragt: '🚢', kurs: '💱', vareVaerdi: '🏷️', vareVaerdiPrKolli: '🏷️', volumen: '📐', tid: '⏱️' };
 
-function tegnFund() {
-  $('#fundAntal').textContent = fund.length + ' fund';
-  if (!fund.length) { $('#fundListe').innerHTML = '<div class="text-sm text-slate-400">Ingen værdier fundet endnu. Upload en case eller indsæt teksten ovenfor.</div>'; return; }
-  const konflikter = Array.from(new Set(fund.filter(f => f.konflikt).map(f => f.type === 'kurs' ? 'valutakurs' : ({ vaegt: 'vægt', volumen: 'volumen', tid: 'transporttid', tiers: 'vægtklasser', minFragt: 'minimumssats', fastFragt: 'fast grundfragt', wmFragt: 'fragt pr. w/m', vareVaerdi: 'vareværdi', vareVaerdiPrKolli: 'vareværdi pr. kolli' }[f.type] || f.type))));
-  const advarsel = konflikter.length
-    ? '<div class="border border-amber-800 bg-amber-950/20 rounded-xl p-3 text-sm text-slate-300 mb-2">Casen indeholder flere forskellige værdier for ' + esc(konflikter.join(', ')) + '. Det sker typisk når casen stiller flere tilbud op mod hinanden. Kun det første er sat til, så du selv vælger hvilket tilbud du regner på.</div>'
-    : '';
-  $('#fundListe').innerHTML = advarsel + fund.map(f =>
-    '<label class="flex items-start gap-3 border rounded-xl p-3 cursor-pointer hover:border-slate-600 ' + (f.konflikt ? 'border-amber-900' : 'border-[#1e2836]') + (f.usikker ? ' opacity-70' : '') + '" data-id="' + f.id + '">' +
+function fundKort(f) {
+  return '<label class="flex items-start gap-3 border rounded-xl p-3 cursor-pointer hover:border-slate-600 ' +
+    (f.konflikt ? 'border-amber-900' : 'border-[#1e2836]') + (f.usikker ? ' opacity-70' : '') + '" data-id="' + f.id + '">' +
     '<input type="checkbox" class="fundCheck accent-emerald-500 mt-1"' + (f.valgt ? ' checked' : '') + '>' +
     '<div class="flex-1 min-w-0">' +
     '<div class="text-sm"><span class="mr-1">' + (FUND_IKON[f.type] || '•') + '</span><span class="font-medium">' + esc(f.label) + '</span> <span class="text-blue-300">' + esc(f.vaerdi) + '</span>' +
     (f.konflikt ? ' <span class="badge bg-amber-900/60 text-amber-200">vælg én</span>' : '') +
     (f.usikker ? ' <span class="badge bg-slate-700 text-slate-300">kontrollér selv</span>' : '') + '</div>' +
     '<div class="text-[11px] text-slate-500 mt-0.5 truncate">fundet i teksten: &laquo;' + esc(f.kilde) + '&raquo;</div>' +
-    '</div></label>').join('');
+    '</div></label>';
 }
 
-function indsaetFund() {
-  const valgte = fund.filter(f => f.valgt);
-  if (!valgte.length) { alert('Vælg mindst én værdi først.'); return; }
-  const s = state;
+function tegnFund() {
+  $('#fundAntal').textContent = fund.length + ' fund';
+  if (!fund.length) { $('#fundListe').innerHTML = '<div class="text-sm text-slate-400">Ingen værdier fundet endnu. Upload en case eller indsæt teksten ovenfor.</div>'; return; }
+
+  let h = '';
+  if (afsnitListe.length) {
+    h += '<div class="border border-blue-900 bg-blue-950/20 rounded-xl p-3 text-sm text-slate-300 mb-3">' +
+      'Casen stiller <span class="font-semibold text-blue-200">' + afsnitListe.length + ' transportmuligheder</span> op mod hinanden. ' +
+      'Satserne er delt op efter den mulighed, de står under, så de ikke blandes sammen. ' +
+      'Når du trykker <span class="font-semibold">Sæt ind i beregningen</span>, regnes hver mulighed for sig, og de stilles op mod hinanden på fanen Sammenlign.</div>';
+  }
+
+  const faelles = fund.filter(f => !f.afsnit);
+  if (faelles.length) {
+    h += gruppe('Gælder alle muligheder', 'Vilkår der står uden for de enkelte tilbud, fx valutakurs, mængde og speditionshonorar.', faelles);
+  }
+  afsnitListe.forEach(a => {
+    const egne = fund.filter(f => f.afsnit === a.nr);
+    if (!egne.length) return;
+    h += gruppe(a.navn, a.beskrivelse || '', egne);
+  });
+
+  function gruppe(titel, note, liste) {
+    const konflikt = liste.some(f => f.konflikt);
+    return '<div class="border border-[#1e2836] rounded-xl p-3 mb-3">' +
+      '<div class="font-semibold text-sm text-blue-200 mb-0.5">' + esc(titel) + '</div>' +
+      (note ? '<div class="text-[11px] text-slate-500 mb-2">' + esc(note) + '</div>' : '<div class="mb-2"></div>') +
+      (konflikt ? '<div class="text-[11px] text-amber-300 mb-2">Her er der flere værdier af samme slags. Vælg den, der hører til.</div>' : '') +
+      '<div class="space-y-2">' + liste.map(fundKort).join('') + '</div></div>';
+  }
+
+  $('#fundListe').innerHTML = h;
+}
+
+// Bygger én færdig beregning ud fra et sæt fund. Bruges både til en enkelt
+// beregning og til én beregning pr. transportmulighed i casen.
+function byggStateFraFund(valgte, navn, grund) {
+  const s = grund ? JSON.parse(JSON.stringify(grund)) : tomState();
+  if (navn) s.caseNavn = navn;
+
   const kolli = valgte.filter(f => f.type === 'kolli');
   if (kolli.length) { s.kolli = kolli.map(f => ({ antal: f.data.antal, l: f.data.l, b: f.data.b, h: f.data.h, vaegt: 0 })); s.inputType = 'kolli'; }
 
+  const mg = valgte.find(f => f.type === 'maengde');
+  if (mg && !kolli.length) {
+    s.inputType = 'direkte';
+    s.volumenDirekte = mg.data.m3;
+    s.antalKolliDirekte = mg.data.antalKolli;
+    if (mg.data.gentag > 1) s.antalForsendelser = mg.data.gentag;
+  }
+  const cont = valgte.find(f => f.type === 'container');
+  if (cont && !kolli.length && !mg) { s.inputType = 'direkte'; s.volumenDirekte = cont.data.m3; s.antalKolliDirekte = cont.data.antal; }
   const vol = valgte.filter(f => f.type === 'volumen');
-  if (vol.length && !kolli.length) { s.inputType = 'direkte'; s.volumenDirekte = vol[vol.length - 1].data.volumen; }
+  if (vol.length && !kolli.length && !mg && !cont) { s.inputType = 'direkte'; s.volumenDirekte = vol[0].data.volumen; }
 
   const v = valgte.filter(f => f.type === 'vaegt');
-  if (v.length) { s.vaegtKilde = 'manuel'; s.vaegtTotal = v[v.length - 1].data.vaegt; }
+  if (v.length) { s.vaegtKilde = 'manuel'; s.vaegtTotal = v[0].data.vaegt; }
 
   const ti = valgte.find(f => f.type === 'tiers');
   if (ti) { s.fragtType = 'trappe'; s.tiers = ti.data.tiers.slice(); if (ti.data.valuta) s.valutaFragt = ti.data.valuta; }
@@ -1520,13 +1874,17 @@ function indsaetFund() {
   if (mf) { s.minFragt = mf.data.min; if (mf.data.valuta) s.valutaFragt = mf.data.valuta; }
 
   const wm = valgte.find(f => f.type === 'wmFragt');
-  if (wm && !ti) { s.fragtType = 'wm'; s.wmSats = wm.data.sats; s.mode = 'soe'; s.faktor = 1000; }
+  if (wm && !ti) { s.fragtType = 'wm'; s.wmSats = wm.data.sats; s.mode = 'soe'; s.faktor = 1000; if (wm.data.valuta) s.valutaFragt = wm.data.valuta; }
 
   const ff = valgte.find(f => f.type === 'fastFragt');
-  if (ff && !ti && !wm) { s.fragtType = 'fast'; s.fastFragt = ff.data.sats; if (ff.data.valuta) s.valutaFragt = ff.data.valuta; }
+  if (ff && !ti && !wm) { s.fragtType = 'fast'; s.fastFragt = ff.data.sats; s.mode = 'soe'; s.faktor = 1000; if (ff.data.valuta) s.valutaFragt = ff.data.valuta; }
 
   valgte.filter(f => f.type === 'kurs').forEach(f => {
-    saetKurs(f.data.valuta, f.data.kurs);
+    const kode = String(f.data.valuta).toUpperCase();
+    if (kode === 'DKK') return;
+    s.valutaer = s.valutaer || [];
+    const r = s.valutaer.find(x => String(x.kode).toUpperCase() === kode);
+    if (r) r.kurs = f.data.kurs; else s.valutaer.push({ kode: kode, kurs: f.data.kurs });
   });
 
   const vv = valgte.find(f => f.type === 'vareVaerdi');
@@ -1546,18 +1904,76 @@ function indsaetFund() {
     s.linjer.push(nyLinje(d));
   });
 
-  // sæt CO2-faktor efter transportform
   if (MODES[s.mode]) s.co2Faktor = MODES[s.mode].co2;
 
-  // sørg for at alle valutaer, der nu er i brug, står i kurstabellen
+  // Procentposter skal regnes af det rigtige grundlag, og et honorar laegges til sidst.
+  const erHonorar = l => /honorar|fee|avance|d(?:æ|ae)kningsbidrag|provision/i.test(l.navn) && !/fuel|br(?:æ|ae)ndstof|caf|ams|doc/i.test(l.navn);
+  const erBraendstof = l => /fuel|br(?:æ|ae)ndstof/i.test(l.navn);
+  const erVejtransport = l => /truck|vogn|fragt\s|fragt$|transport|kørsel|koersel|for\s*transport|efter\s*transport/i.test(l.navn);
+
+  // honorarlinjer flyttes bagerst, saa de kan regne af alt det foran
+  const honorarer = s.linjer.filter(l => l.type === 'pct' && erHonorar(l));
+  s.linjer = s.linjer.filter(l => honorarer.indexOf(l) < 0).concat(honorarer);
+
+  s.linjer.forEach((l, i) => {
+    if (l.type !== 'pct') return;
+    if (erBraendstof(l)) {
+      // brændstoftillæg i procent hører til vejtransporten, hvis der er en
+      const vej = s.linjer.filter(x => x.type !== 'pct' && erVejtransport(x) && x.aktiv);
+      if (vej.length) l.pctRefs = vej.map(x => x.id);
+      return;
+    }
+    if (erHonorar(l)) {
+      l.pctRefs = ['GRUNDFRAGT'].concat(s.linjer.slice(0, i).map(x => x.id));
+    }
+  });
+
   const brugte = [s.valutaFragt].concat(s.linjer.filter(l => l.type !== 'pct').map(l => l.valuta));
   brugte.forEach(k => {
     if (!k || k === 'DKK') return;
-    if (!(s.valutaer || []).some(v => String(v.kode).toUpperCase() === k)) saetKurs(k, 0);
+    if (!(s.valutaer || []).some(x => String(x.kode).toUpperCase() === k)) s.valutaer.push({ kode: k, kurs: 0 });
   });
+  return s;
+}
 
-  fyldFormular();
-  $$('.tabbtn').find(b => b.dataset.tab === 'beregner').click();
+function gaaTilFane(navn) {
+  const b = $$('.tabbtn').find(x => x.dataset.tab === navn);
+  if (b) b.click();
+}
+
+function indsaetFund() {
+  const valgte = fund.filter(f => f.valgt);
+  if (!valgte.length) { alert('Vælg mindst én værdi først.'); return; }
+
+  const faelles = valgte.filter(f => !f.afsnit);
+  const mulige = afsnitListe.filter(a => valgte.some(f => f.afsnit === a.nr));
+
+  if (mulige.length > 1) {
+    // Casen har flere transportmuligheder. Hver mulighed regnes for sig,
+    // med casens faelles vilkaar lagt oveni, og gemmes til sammenligning.
+    const arr = hentScenarier();
+    let foerste = null;
+    mulige.forEach(a => {
+      const st = byggStateFraFund(faelles.concat(valgte.filter(f => f.afsnit === a.nr)), a.navn);
+      if (!foerste) foerste = st;
+      const gemtState = state;
+      state = st;
+      const r = beregn();
+      arr.push({ navn: a.navn, beskrivelse: a.beskrivelse || '', mode: MODES[st.mode].navn, vaegt: r.fragtpligtig, total: r.total,
+        kapital: r.kapitalbinding, tid: num(st.transportTid), frekvens: num(st.frekvens),
+        paalidelighed: num(st.paalidelighed), co2: r.co2, volumen: r.volumen * r.antal,
+        prosa: a.prosa || '', state: JSON.parse(JSON.stringify(st)) });
+      state = gemtState;
+    });
+    gemScenarier(arr);
+    state = foerste;
+    fyldFormular();
+    gaaTilFane('sammenlign');
+  } else {
+    state = byggStateFraFund(valgte, state.caseNavn || 'Beregning fra case');
+    fyldFormular();
+    gaaTilFane('beregner');
+  }
   try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
 }
 
@@ -1571,10 +1987,8 @@ async function haandterFiler(filer) {
     try {
       const tekst = await laesFil(file);
       samletTekst += '\n\n===== ' + file.name + ' =====\n' + tekst;
-      const antalFoer = fund.length;
-      fund = fund.concat(findVaerdier(tekst).filter(nyt => !fund.some(g => g.type === nyt.type && JSON.stringify(g.data) === JSON.stringify(nyt.data))));
-      markerKonflikter(fund);
-      linje.innerHTML = '<span class="text-emerald-400">✔</span> ' + esc(file.name) + ' <span class="text-xs text-slate-500">(' + (fund.length - antalFoer) + ' nye fund, ' + fmt(tekst.length / 1000, 1) + ' k tegn)</span>';
+      const nye = tilfoejFund(findVaerdier(tekst), file.name);
+      linje.innerHTML = '<span class="text-emerald-400">✔</span> ' + esc(file.name) + ' <span class="text-xs text-slate-500">(' + nye + ' nye fund, ' + fmt(tekst.length / 1000, 1) + ' k tegn)</span>';
       linje.className = 'flex items-center gap-2 text-slate-300';
     } catch (e) {
       linje.innerHTML = '<span class="text-red-400">✕</span> ' + esc(file.name) + ' <span class="text-xs text-red-300">kunne ikke læses: ' + esc(e.message) + '</span>';
@@ -1641,6 +2055,13 @@ function bind() {
     saetKurs(kode, kurs);
     $('#nyValutaKode').value = ''; $('#nyValutaKurs').value = '';
     fyldFormular();
+  });
+
+  $('#beregnKnap').addEventListener('click', () => {
+    tegnResultat();
+    const b = $('#beregnKnap'), t = b.textContent; b.textContent = 'Beregnet ✔';
+    setTimeout(() => { b.textContent = t; }, 1200);
+    try { $('#resultat').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
   });
 
   $('#fragtType').addEventListener('change', e => { state.fragtType = e.target.value; visFragtBoks(); tegnResultat(); });
@@ -1748,8 +2169,7 @@ function bind() {
     const t = $('#raaTekst').value;
     if (!t.trim()) { alert('Indsæt noget tekst først.'); return; }
     samletTekst += '\n\n===== indsat tekst =====\n' + t;
-    fund = fund.concat(findVaerdier(t).filter(nyt => !fund.some(g => g.type === nyt.type && JSON.stringify(g.data) === JSON.stringify(nyt.data))));
-    markerKonflikter(fund);
+    tilfoejFund(findVaerdier(t), 'indsat tekst');
     $('#tekstDump').textContent = samletTekst.slice(0, 60000);
     tegnFund();
   });
