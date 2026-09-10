@@ -60,7 +60,10 @@
       <div class="text-xs text-slate-500 mt-1">Flere filer ad gangen er i orden</div>
       <input type="file" id="filInput" class="hidden" multiple accept=".pdf,.docx,.xlsx,.pptx,.txt,.csv,.md">
     </div>
-    <div id="filListe" class="mt-3 space-y-1 text-sm"></div>
+    <div class="mt-3 flex items-start gap-3">
+      <div id="filListe" class="flex-1 space-y-1 text-sm"></div>
+      <button id="rydFiler" class="text-xs bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg whitespace-nowrap">Ryd alt</button>
+    </div>
   </div>
 
   <div class="card p-4">
@@ -2002,6 +2005,11 @@ function tegnFund() {
   if (!fund.length) { $('#fundListe').innerHTML = '<div class="text-sm text-slate-400">Ingen værdier fundet endnu. Upload en case eller indsæt teksten ovenfor.</div>'; return; }
 
   let h = '';
+  if (fund.length > 60) {
+    h += '<div class="border border-amber-800 bg-amber-950/20 rounded-xl p-3 text-sm text-slate-300 mb-3">' +
+      'Der er fundet ' + fund.length + ' værdier. Så mange tal står der sjældent i én case. ' +
+      'Tjek om du har uploadet et kompendium eller en hel bog ved siden af casen, og ryd op med knappen Ryd alt.</div>';
+  }
   if (afsnitListe.length) {
     h += '<div class="border border-blue-900 bg-blue-950/20 rounded-xl p-3 text-sm text-slate-300 mb-3">' +
       'Casen stiller <span class="font-semibold text-blue-200">' + afsnitListe.length + ' transportmuligheder</span> op mod hinanden. ' +
@@ -2179,8 +2187,11 @@ async function haandterFiler(filer) {
       const tekst = await laesFil(file);
       samletTekst += '\n\n===== ' + file.name + ' =====\n' + tekst;
       const nye = tilfoejFund(findVaerdier(tekst), file.name);
-      linje.innerHTML = '<span class="text-emerald-400">✔</span> ' + esc(file.name) + ' <span class="text-xs text-slate-500">(' + nye + ' nye fund, ' + fmt(tekst.length / 1000, 1) + ' k tegn)</span>';
-      linje.className = 'flex items-center gap-2 text-slate-300';
+      const stor = tekst.length > 300000;
+      linje.innerHTML = '<span class="text-emerald-400">✔</span> ' + esc(file.name) +
+        ' <span class="text-xs text-slate-500">(' + nye + ' nye fund, ' + fmt(tekst.length / 1000, 1) + ' k tegn)</span>' +
+        (stor ? '<div class="text-[11px] text-amber-300 ml-6">Meget stor fil. Det ligner en bog eller et kompendium frem for en case. Upload helst kun selve casen og dens bilag, ellers drukner de rigtige tal i støj.</div>' : '');
+      linje.className = 'flex items-start gap-2 text-slate-300 flex-wrap';
     } catch (e) {
       linje.innerHTML = '<span class="text-red-400">✕</span> ' + esc(file.name) + ' <span class="text-xs text-red-300">kunne ikke læses: ' + esc(e.message) + '</span>';
     }
@@ -2367,6 +2378,15 @@ function bind() {
   ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
   drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) haandterFiler(Array.from(e.dataTransfer.files)); });
+
+  $('#rydFiler').addEventListener('click', () => {
+    if (fund.length && !confirm('Ryd alle uploadede filer og fundne værdier? Dine gemte muligheder under Sammenlign bevares.')) return;
+    fund = []; afsnitListe = []; samletTekst = ''; opdelingTilstand = 'auto';
+    $('#filListe').innerHTML = '';
+    $('#raaTekst').value = '';
+    $('#tekstDump').textContent = '';
+    tegnFund();
+  });
 
   $('#scanTekst').addEventListener('click', () => {
     const t = $('#raaTekst').value;
