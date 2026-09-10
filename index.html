@@ -178,6 +178,7 @@
         <select id="incotermVersion" class="text-sm">
           <option value="">ikke oplyst</option><option>2020</option><option>2010</option><option>2000</option>
         </select>
+        <div class="text-[11px] text-slate-500 mt-1">Vælg version først, så vises kun de klausuler, der fandtes dengang.</div>
       </div>
     </div>
     <div id="incotermForklaring" class="mt-4"></div>
@@ -399,6 +400,20 @@
       <div><dt class="font-medium text-blue-300">PSS &mdash; Peak Season Surcharge</dt><dd class="text-slate-300">Højsæsontillæg når efterspørgslen overstiger kapaciteten, typisk Fjernøsten om efteråret.</dd></div>
       <div><dt class="font-medium text-blue-300">Repositioning</dt><dd class="text-slate-300">Tillæg for at flytte tomme containere tilbage til ubalancerede markeder.</dd></div>
     </dl>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="font-semibold mb-2">Leveringsbetingelser (Incoterms)</h2>
+    <p class="text-sm text-slate-300 mb-3">Incoterms fastlægger, hvem der betaler for transport og dokumenter, hvor risikoen går over, og hvem der har forsikringspligten. Klausulerne har skiftet fra version til version, så en klausul og en version, der ikke passer sammen, er et fagligt fejlsvar.</p>
+    <div class="scroll"><table class="text-sm w-full min-w-[520px]">
+      <thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Version</th><th class="text-left">Gyldige klausuler</th></tr></thead>
+      <tbody class="divide-y divide-[#1e2836]">
+        <tr><td class="align-top">Incoterms 2020</td><td>EXW, FCA, FAS, FOB, CFR, CIF, CPT, CIP, DAP, DPU, DDP</td></tr>
+        <tr><td class="align-top">Incoterms 2010</td><td>EXW, FCA, FAS, FOB, CFR, CIF, CPT, CIP, DAP, DAT, DDP</td></tr>
+        <tr><td class="align-top">Incoterms 2000</td><td>EXW, FCA, FAS, FOB, CFR, CIF, CPT, CIP, DAF, DES, DEQ, DDU, DDP</td></tr>
+      </tbody>
+    </table></div>
+    <p class="text-xs text-slate-400 mt-3">DPU blev indført i 2020 og hed DAT i 2010. DDU, DAF, DES og DEQ udgik med 2010-versionen. <span class="text-amber-300">FAS, FOB, CFR og CIF</span> må kun bruges til søtransport og indre vandveje &mdash; ved luft, bane og vej er FCA, CPT eller CIP de rigtige. Står versionen ikke i casen, så skriv i din besvarelse, hvilken version du forudsætter.</p>
   </div>
 
   <div class="card p-4">
@@ -686,6 +701,11 @@ function mangler(s, r) {
 
 function incotermAfsnit(s) {
   const inc = INCOTERMS[s.incoterm];
+  const vf = incotermVersionsFejl(s.incoterm, s.incotermVersion);
+  if (inc && vf) {
+    return 'Casen kombinerer ' + s.incoterm + ' med Incoterms ' + s.incotermVersion + ', men det passer ikke sammen: ' + vf +
+      ' Klausulen skal derfor kontrolleres mod casen, før leveringsbetingelsen kan bruges i vurderingen.';
+  }
   if (!inc) {
     return 'Der er ikke oplyst nogen leveringsbetingelse. Det er en væsentlig mangel, for Incoterms afgør, ' +
       'hvem der betaler for- og eftertransport, terminalgebyrer, told og forsikring, og hvor risikoen går over. ' +
@@ -763,12 +783,48 @@ function forudsaetninger(s, r) {
   return f;
 }
 
+// Incoterms har skiftet klausuler fra version til version. En klausul
+// sammen med en version, hvor den ikke fandtes, er et fagligt fejlsvar.
+const INCOTERM_VERSIONER = {
+  '2020': ['EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'],
+  '2010': ['EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DAT', 'DDP'],
+  '2000': ['EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAF', 'DES', 'DEQ', 'DDU', 'DDP']
+};
+// Klausuler kun til søtransport og indre vandveje
+const INCOTERM_KUN_SOE = ['FAS', 'FOB', 'CFR', 'CIF', 'DES', 'DEQ'];
+
+// Fejlbesked, når klausul og version ikke passer sammen
+function incotermVersionsFejl(kode, ver) {
+  if (!kode || !ver || !INCOTERM_VERSIONER[ver]) return '';
+  if (INCOTERM_VERSIONER[ver].indexOf(kode) >= 0) return '';
+  const svar = {
+    'DPU|2010': 'DPU findes kun i Incoterms 2020. I Incoterms 2010 hed klausulen DAT.',
+    'DPU|2000': 'DPU findes kun i Incoterms 2020. I Incoterms 2000 var de nærmeste D-klausuler DES, DEQ og DDU.',
+    'DAT|2020': 'DAT blev omdøbt til DPU i Incoterms 2020. Vælg DPU.',
+    'DAT|2000': 'DAT blev først indført i Incoterms 2010. I Incoterms 2000 fandtes DAF, DES, DEQ og DDU.',
+    'DDU|2020': 'DDU udgik med Incoterms 2010 og er erstattet af DAP.',
+    'DDU|2010': 'DDU udgik med Incoterms 2010 og er erstattet af DAP.',
+    'DAP|2000': 'DAP blev først indført i Incoterms 2010. I Incoterms 2000 var DDU eller DES det nærmeste.',
+    'DAF|2020': 'DAF udgik med Incoterms 2010. Brug DAP.',
+    'DAF|2010': 'DAF udgik med Incoterms 2010. Brug DAP.',
+    'DES|2020': 'DES udgik med Incoterms 2010. Brug DAP eller DPU.',
+    'DES|2010': 'DES udgik med Incoterms 2010. Brug DAP eller DPU.',
+    'DEQ|2020': 'DEQ udgik med Incoterms 2010. Brug DPU.',
+    'DEQ|2010': 'DEQ udgik med Incoterms 2010. Brug DPU.'
+  };
+  return svar[kode + '|' + ver] || (kode + ' findes ikke i Incoterms ' + ver + '. Kontrollér klausulen mod casen.');
+}
+
 function tegnIncoterm() {
   const v = $('#incoterm');
   if (!v) return;
-  const koder = Object.keys(INCOTERMS);
+  const ver = state.incotermVersion;
+  const gyldige = INCOTERM_VERSIONER[ver] || Object.keys(INCOTERMS);
+  // Kun klausuler fra den valgte version. Den valgte klausul vises altid, også hvis den ikke passer.
+  const vis = Object.keys(INCOTERMS).filter(k => gyldige.indexOf(k) >= 0 || k === state.incoterm);
   v.innerHTML = '<option value="">— ikke oplyst i casen —</option>' +
-    koder.map(k => '<option value="' + k + '">' + k + ' — ' + INCOTERMS[k].dansk + '</option>').join('');
+    vis.map(k => '<option value="' + k + '"' + (gyldige.indexOf(k) < 0 ? ' data-ugyldig="1"' : '') + '>' +
+      k + ' — ' + INCOTERMS[k].dansk + (ver && gyldige.indexOf(k) < 0 ? '  (ikke i ' + ver + ')' : '') + '</option>').join('');
   v.value = state.incoterm || '';
   $('#incotermSted').value = state.incotermSted || '';
   $('#incotermVersion').value = state.incotermVersion || '';
@@ -781,16 +837,33 @@ function tegnIncoterm() {
       'Uden leveringsbetingelse kan du ikke vide, om fortransport, hovedtransport, terminalgebyrer, told og forsikring er dine omkostninger eller sælgers.</div>';
     return;
   }
+
+  const advarsler = [];
+  const versFejl = incotermVersionsFejl(state.incoterm, ver);
+  if (versFejl) advarsler.push('Ugyldig kombination: ' + versFejl + ' Kontrollér teksten i casen.');
+  if (!ver) advarsler.push('Incoterms-versionen er ikke oplyst. Vælg ikke en version uden at skrive det som en forudsætning i din besvarelse.');
+  if (INCOTERM_KUN_SOE.indexOf(state.incoterm) >= 0 && state.mode !== 'soe') {
+    advarsler.push('Kontrollér transportformen: ' + state.incoterm + ' må kun anvendes til søtransport og transport på indre vandveje. Ved ' +
+      MODES[state.mode].navn.toLowerCase() + ' vil FCA, CPT eller CIP normalt være den relevante klausul.');
+  }
+
   const sted = state.incotermSted ? ' ' + state.incotermSted : '';
   const rows = [
-    ['Klausul', state.incoterm + sted + (state.incotermVersion ? ', Incoterms ' + state.incotermVersion : '') + ' — ' + i.navn],
+    ['Klausul', state.incoterm + sted + (ver ? ', Incoterms ' + ver : '') + ' — ' + i.navn],
     ['Hovedtransporten betales af', i.hovedtransport],
     ['Risikoen går over', i.risiko],
     ['Forsikring', i.forsikring]
   ];
-  boks.innerHTML = '<table class="text-sm w-full"><tbody class="divide-y divide-[#1e2836]">' +
-    rows.map(x => '<tr><td class="text-slate-400 align-top w-52">' + esc(x[0]) + '</td><td>' + esc(x[1]) + '</td></tr>').join('') +
-    '</tbody></table><div class="text-xs text-slate-400 mt-2">' + esc(i.note) + '</div>';
+  const rodBoks = advarsler.length
+    ? '<div class="border border-red-800 bg-red-950/30 rounded-xl p-3 text-sm text-red-200 mb-3"><ul class="list-disc pl-5 space-y-1">' +
+      advarsler.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>'
+    : '';
+  const tabel = versFejl
+    ? '<div class="text-xs text-slate-500">Forklaringen vises, når klausul og version passer sammen.</div>'
+    : '<table class="text-sm w-full"><tbody class="divide-y divide-[#1e2836]">' +
+      rows.map(x => '<tr><td class="text-slate-400 align-top w-52">' + esc(x[0]) + '</td><td>' + esc(x[1]) + '</td></tr>').join('') +
+      '</tbody></table><div class="text-xs text-slate-400 mt-2">' + esc(i.note) + '</div>';
+  boks.innerHTML = rodBoks + tabel;
 }
 
 // ============================================================
@@ -1188,13 +1261,15 @@ function tegnVurdering(r) {
 
   // --- leveringsbetingelsen ---
   const inc2 = INCOTERMS[state.incoterm];
+  const vFejl = incotermVersionsFejl(state.incoterm, state.incotermVersion);
+  if (vFejl) add('advarsel', 'Leveringsbetingelsen passer ikke til den valgte Incoterms-version. ' + vFejl + ' Ret klausul eller version under punkt B.');
+  if (inc2 && !state.incotermVersion) add('info', 'Incoterms-versionen er ikke oplyst. Skriv i din besvarelse, hvilken version du forudsætter.');
+  if (inc2 && INCOTERM_KUN_SOE.indexOf(state.incoterm) >= 0 && state.mode !== 'soe') {
+    add('advarsel', 'Kontrollér transportformen: ' + state.incoterm + ' må kun anvendes til søtransport. Ved ' + MODES[state.mode].navn.toLowerCase() + ' er FCA, CPT eller CIP den rigtige klausul.');
+  }
   if (!inc2) {
     add('advarsel', 'Der er ikke valgt en leveringsbetingelse. Uden Incoterms ved du ikke, om for- og eftertransport, terminalgebyrer, told og forsikring er dine omkostninger eller modpartens. Find klausulen i casen, eller vælg en selv og skriv det som en forudsætning under punkt B.');
   } else {
-    if (inc2.form === 'soe' && state.mode !== 'soe') {
-      add('advarsel', state.incoterm + ' er en ren søfragtsklausul og passer ikke til ' + MODES[state.mode].navn.toLowerCase() +
-        '. Ved luft, bane og vej bruges i stedet FCA, CPT, CIP eller D-klausulerne. Det er en klassisk fejl, og den bliver bemærket.');
-    }
     if (state.mode === 'soe' && inc2.form === 'soe' && r.antalKolli > 0 && (state.incoterm === 'FOB' || state.incoterm === 'CIF')) {
       add('info', state.incoterm + ' er skrevet til stykgods, der lastes over skibssiden. Ved containergods, hvor godset afleveres på en terminal, er FCA eller CIP mere præcise.');
     }
@@ -3137,7 +3212,8 @@ function bind() {
 
   $('#incoterm').addEventListener('change', e => { state.incoterm = e.target.value; tegnIncoterm(); tegnResultat(); });
   $('#incotermSted').addEventListener('input', e => { state.incotermSted = e.target.value; tegnIncoterm(); });
-  $('#incotermVersion').addEventListener('change', e => { state.incotermVersion = e.target.value; tegnIncoterm(); });
+  $('#incotermVersion').addEventListener('change', e => { state.incotermVersion = e.target.value; tegnIncoterm(); tegnResultat(); });
+  $('#incoterm').addEventListener('change', () => tegnResultat());
 
   $('#fragtType').addEventListener('change', e => { state.fragtType = e.target.value; visFragtBoks(); tegnResultat(); });
   $('#brugBreakpoint').addEventListener('change', e => { state.brugBreakpoint = e.target.checked; tegnResultat(); });
