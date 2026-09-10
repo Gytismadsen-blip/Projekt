@@ -80,6 +80,8 @@
       </div>
     </div>
     <p class="text-xs text-slate-400 mb-3">Kontrollér altid tallene mod casen. Mønstergenkendelse kan misse noget, og et forkert udgangstal giver et forkert facit.</p>
+    <div id="opdeling" class="mb-3"></div>
+    <div id="tjekliste" class="mb-3"></div>
     <div id="fundListe" class="space-y-2"></div>
   </div>
 
@@ -788,6 +790,15 @@ function tegnVurdering(r) {
   const brugteVal = [state.valutaFragt].concat(state.linjer.filter(l => l.aktiv && l.type !== 'pct').map(l => l.valuta));
   const manglerKurs = Array.from(new Set(brugteVal)).filter(v => v && v !== 'DKK' && !(num(r.kurs[v]) > 0));
   if (manglerKurs.length) add('advarsel', 'Der mangler en kurs for ' + manglerKurs.join(' og ') + '. Poster i den valuta tælles som 0 kr., så totalen er for lav. Udfyld kursen under punkt F.');
+  if (state.kursFundet) {
+    const gaettede = Array.from(new Set(brugteVal)).filter(v => v && v !== 'DKK' &&
+      state.kursFundet.indexOf(v) < 0 && num(r.kurs[v]) > 0);
+    if (gaettede.length) {
+      add('advarsel', 'Casen oplyser ingen kurs for ' + gaettede.join(' og ') + '. Der regnes med standardkursen ' +
+        gaettede.map(v => fmt(num(r.kurs[v])) + ' DKK pr. ' + v).join(' og ') +
+        ', som formentlig ikke er den, opgaven vil have. Find kursen i casen og ret den under punkt F.');
+    }
+  }
   const store = (state.valutaer || []).filter(v => num(v.kurs) > 50);
   if (store.length) add('advarsel', 'Kursen for ' + store.map(v => String(v.kode).toUpperCase()).join(' og ') + ' ser ud til at være angivet pr. 100 enheder. Kurs 745,00 betyder 7,45 DKK pr. euro. Skriv kursen pr. 1 enhed.');
 
@@ -1441,6 +1452,7 @@ async function laesPdf(file) {
 // ellers et helt tal med valgfri decimal. Uden den raekkefoelge klippes fx 1100 til 110.
 // Valutakoder der genkendes i casetekst. Tilfoej flere i KENDTE_VALUTAER ogsaa.
 const VAL = '(USD|EUR|DKK|GBP|SEK|NOK|CHF|PLN|CNY|JPY|CAD|AUD|kr|\\$|€|£)';
+const VALNC = '(?:USD|EUR|DKK|GBP|SEK|NOK|CHF|PLN|CNY|JPY|CAD|AUD|kr|\\$|€|£)';
 const N = '(\\d{1,3}(?:\\.\\d{3})+(?:,\\d+)?|\\d{1,3}(?:\\s\\d{3})+(?:[.,]\\d+)?|\\d+(?:[.,]\\d+)?)';
 
 // ------------------------------------------------------------
@@ -1450,6 +1462,24 @@ const N = '(\\d{1,3}(?:\\.\\d{3})+(?:,\\d+)?|\\d{1,3}(?:\\s\\d{3})+(?:[.,]\\d+)?
 // ------------------------------------------------------------
 const PRIS_LINJE = /^[ \t]*(USD|EUR|DKK|GBP|SEK|NOK|CHF|PLN|CNY)[ \t]*[–\-:]/i;
 const MULIGHED_OVERSKRIFT = /^[ \t]*(?:option|mulighed|tilbud|offer|alternativ|forslag|løsning|variant|scenario|forslag)[ \t:.#\-]*(\d{1,2}|[A-Fa-f])\b/i;
+
+// En takstlinje er en kort linje med et tal og en enhed: "Freight 67 USD W/M",
+// "CAF +37 %", "THC 4 USD pr. 100 kg". Prosa falder fra paa laengde og antal ord.
+function erTakstLinje(l) {
+  const t = String(l).trim();
+  if (!t || t.length > 130 || !/\d/.test(t)) return false;
+  if (t.split(/\s+/).length > 16) return false;
+  return /(?:USD|EUR|DKK|GBP|SEK|NOK|CHF|PLN|CNY|\bkr\b|%|\bw\s*\/\s*m\b|\bpr\.|\bper\b|\/\s*(?:kg|m3|m³|cbm))/i.test(t);
+}
+
+// En grundfragtlinje naevner selve fragten, ikke bare et tillaeg. En trappe af
+// Q-satser springes over, fordi hele trappen hoerer til ét og samme tilbud.
+function erGrundfragtLinje(l) {
+  if (!erTakstLinje(l)) return false;
+  if (/^\s*Q\s*\d/i.test(l)) return false;
+  if (/exchange\s*rate|valutakurs|\bkurs\b|rate of exchange/i.test(l)) return false;
+  return /\b(freight|fragt|rate|takst|leje|rent|hire|transport|carriage|pris|price|offer|tilbud)\b/i.test(l);
+}
 
 function findAfsnit(tekst) {
   const blokke = [];
@@ -1464,6 +1494,9 @@ function findAfsnit(tekst) {
   let valgte = blokke.filter(b => b.tekst.split('\n').some(l => PRIS_LINJE.test(l)));
   // 2. ellers blokke med en tydelig overskrift som "Option 2" eller "Mulighed 2"
   if (valgte.length < 2) valgte = blokke.filter(b => b.tekst.split('\n').some(l => MULIGHED_OVERSKRIFT.test(l)));
+  // 3. ellers blokke der selv naevner en grundfragt. En trappe af Q-satser er
+  //    én takst for ét tilbud, ikke flere tilbud, saa den taeller ikke med.
+  if (valgte.length < 2) valgte = blokke.filter(b => b.tekst.split('\n').filter(erGrundfragtLinje).length >= 1);
   if (valgte.length < 2) return [];
 
   return valgte.map((b, i) => {
@@ -1549,6 +1582,35 @@ function findVaerdier(tekst) {
            data: { antal: stk, l: l, b: br, h: h } });
   }
 
+  // --- maal skrevet som L/B/H hver for sig ---
+  const AKSE = { l: 'l', length: 'l', laengde: 'l', 'længde': 'l', w: 'b', b: 'b', width: 'b', bredde: 'b', h: 'h', height: 'h', hoejde: 'h', 'højde': 'h' };
+  const maalRe = /\b(l|w|b|h|length|width|height|l(?:æ|ae)ngde|bredde|h(?:ø|oe)jde)\s*[:=]?\s*(\d{1,4}(?:[.,]\d+)?)\s*(cm|mm|m)\b/gi;
+  const raaMaal = [];
+  while ((m = maalRe.exec(t)) !== null) {
+    const akse = AKSE[m[1].toLowerCase()];
+    if (!akse) continue;
+    let v = num(m[2]);
+    const e = m[3].toLowerCase();
+    if (e === 'mm') v /= 10; else if (e === 'm') v *= 100;
+    raaMaal.push({ akse: akse, v: v, pos: m.index, slut: m.index + m[0].length });
+  }
+  for (let i = 0; i + 2 < raaMaal.length + 1; i++) {
+    const g = [raaMaal[i], raaMaal[i + 1], raaMaal[i + 2]];
+    if (g.some(x => !x)) break;
+    if (g[2].slut - g[0].pos > 110) continue;                  // skal staa taet paa hinanden
+    const akser = g.map(x => x.akse);
+    if (new Set(akser).size !== 3) continue;                   // skal vaere tre forskellige
+    const maal = {};
+    g.forEach(x => { maal[x.akse] = x.v; });
+    if (!(maal.l > 0 && maal.b > 0 && maal.h > 0)) continue;
+    if (maal.l > 2000 || maal.b > 2000 || maal.h > 2000) continue;
+    g.forEach(x => brugt.push([x.pos, x.slut]));
+    push({ pos: g[0].pos, type: 'kolli', label: '1 kolli à ' + fmt(maal.l, 0) + '×' + fmt(maal.b, 0) + '×' + fmt(maal.h, 0) + ' cm',
+      vaerdi: fmt(maal.l * maal.b * maal.h / 1000000, 4) + ' m³', kilde: t.slice(g[0].pos, g[2].slut),
+      data: { antal: 1, l: maal.l, b: maal.b, h: maal.h } });
+    i += 2;
+  }
+
   // --- vægt ---
   const vRe = new RegExp('(?:samlet\\s+)?(?:brutto)?(?:v(?:æ|ae)gt|weight|gross\\s+weight)\\D{0,25}' + N + '\\s*(kg|kilo|tons?|t\\b)', 'gi');
   while ((m = vRe.exec(t)) !== null) {
@@ -1580,6 +1642,19 @@ function findVaerdier(tekst) {
     push({ pos: tierPos, type: 'tiers', label: 'Vægtklasser (Q-satser)',
            vaerdi: tiers.map(x => 'Q' + x.fra + ': ' + fmt(x.sats, 2)).join(' · ') + (val ? ' ' + val : ''),
            kilde: 'trappesats', data: { tiers: tiers.map(x => ({ fra: x.fra, sats: x.sats })), valuta: val || 'USD' } });
+  }
+
+  // --- flad fragtsats pr. kg, fx "Freight: 3 DKK pr. kg." ---
+  const pkgRe = new RegExp('(?:freight|fragt|rate|takst)\\s*[:\\-]?[^\\n\\d]{0,15}' + VAL + '?\\s*' + N + '\\s*' + VAL + '?\\s*(?:pr\\.?|per|/)\\s*kg', 'gi');
+  while ((m = pkgRe.exec(t)) !== null) {
+    if (erBrugt(m)) continue;
+    const v = num(m[2]);
+    const pkgVal = valutaAf(m[1] || m[3]) || linjeValuta(m.index) || 'DKK';
+    if (v > 0 && v < 1000) {
+      reserver(m);
+      push({ pos: m.index, type: 'tiers', label: 'Fragtsats pr. kg', vaerdi: fmt(v, 2) + ' ' + pkgVal + ' pr. kg',
+        kilde: m[0].trim(), data: { tiers: [{ fra: 0, sats: v }], valuta: pkgVal } });
+    }
   }
 
   // --- minimumssats ---
@@ -1626,11 +1701,12 @@ function findVaerdier(tekst) {
   }
 
   // --- THC dobbelt ---
-  const thcRe = new RegExp('\\bTHC\\b\\D{0,12}' + N + '\\s*(?:pr\\.?|per)\\s*100\\s*kg\\.?\\s*[/,]\\s*' + N + '\\s*(?:pr\\.?|per)\\s*(?:cbm|m3|m³)\\s*(?:\\(\\s*min\\.?\\s*' + N + '\\s*\\))?', 'gi');
+  const thcRe = new RegExp('\\bTHC\\b\\D{0,12}' + N + '\\s*' + VAL + '?\\s*(?:pr\\.?|per)\\s*100\\s*kg\\.?\\s*[/,]\\s*' + N + '\\s*' + VALNC + '?\\s*(?:pr\\.?|per)\\s*(?:cbm|m3|m³)\\s*(?:\\(\\s*min\\.?\\s*' + N + '\\s*' + VALNC + '?\\s*\\))?', 'gi');
   while ((m = thcRe.exec(t)) !== null) {
     reserver(m);
-    push({ pos: m.index, type: 'linje', label: 'THC', vaerdi: fmt(num(m[1]), 2) + ' pr. 100 kg / ' + fmt(num(m[2]), 2) + ' pr. m³' + (m[3] ? ' (min. ' + fmt(num(m[3])) + ')' : ''), kilde: m[0].trim(),
-      data: { navn: 'THC', type: 'thc', valuta: 'DKK', sats: num(m[1]), sats2: num(m[2]), min: m[3] ? num(m[3]) : 0 } });
+    const thcVal = valutaAf(m[2]) || linjeValuta(m.index) || 'DKK';
+    push({ pos: m.index, type: 'linje', label: 'THC', vaerdi: fmt(num(m[1]), 2) + ' ' + thcVal + ' pr. 100 kg / ' + fmt(num(m[3]), 2) + ' pr. m³' + (m[4] ? ' (min. ' + fmt(num(m[4])) + ')' : ''), kilde: m[0].trim(),
+      data: { navn: 'THC', type: 'thc', valuta: thcVal, sats: num(m[1]), sats2: num(m[3]), min: m[4] ? num(m[4]) : 0 } });
   }
 
   // --- enkle DKK-gebyrer: NAVN nnn ---
@@ -1708,6 +1784,16 @@ function findVaerdier(tekst) {
     const koder = (m[0].toUpperCase().match(/\b[A-Z]{3}\b/g) || []).filter(k => k !== 'DKK' && KENDTE_VALUTAER.indexOf(k) >= 0);
     const kode = koder.length ? koder[0] : (valutaAf(m[1]) !== 'DKK' ? valutaAf(m[1]) : '');
     if (v > 0.5 && v < 100 && kode) push({ pos: m.index, type: 'kurs', label: 'Valutakurs 1 ' + kode, vaerdi: fmt(v) + ' DKK', kilde: m[0].trim(), data: { valuta: kode, kurs: v } });
+  }
+
+  // "USD - DKK exchange rate was set at 5.50" - valutaen staar foer ordet kurs
+  const kRe3 = new RegExp(VAL + '[^\\d\\n]{0,25}(?:exchange\\s*rate|valutakurs|\\bkurs\\b)[^\\d\\n]{0,25}' + N, 'gi');
+  while ((m = kRe3.exec(t)) !== null) {
+    if (erBrugt(m)) continue;
+    let v = num(m[2]);
+    if (v > 100 && v < 1500) v = v / 100;
+    const kode = valutaAf(m[1]);
+    if (v > 0.5 && v < 100 && kode && kode !== 'DKK') push({ pos: m.index, type: 'kurs', label: 'Valutakurs 1 ' + kode, vaerdi: fmt(v) + ' DKK', kilde: m[0].trim(), data: { valuta: kode, kurs: v } });
   }
 
   // --- vareværdi ---
@@ -1848,6 +1934,55 @@ function navnFor(s) {
 const FUND_IKON = { kolli: '📦', vaegt: '⚖️', tiers: '📊', minFragt: '📊', linje: '💰', wmFragt: '🚢',
   fastFragt: '🚢', kurs: '💱', vareVaerdi: '🏷️', vareVaerdiPrKolli: '🏷️', volumen: '📐', tid: '⏱️' };
 
+
+// Hvordan skal casen laeses? Genkendelsen kan tage fejl paa en ukendt case,
+// saa valget ligger hos brugeren.
+let opdelingTilstand = 'auto';   // 'auto' = én beregning pr. mulighed, 'samlet' = alt i én
+
+function tegnOpdeling() {
+  const boks = $('#opdeling');
+  if (!boks) return;
+  if (afsnitListe.length < 2) { boks.innerHTML = ''; return; }
+  boks.innerHTML = '<div class="border border-blue-900 bg-blue-950/20 rounded-xl p-3 text-sm text-slate-300">' +
+    '<div class="mb-2">Casen ser ud til at stille <span class="font-semibold text-blue-200">' + afsnitListe.length +
+    ' transportmuligheder</span> op mod hinanden. Passer det ikke, så vælg om.</div>' +
+    '<div class="flex flex-wrap gap-4">' +
+    '<label class="flex items-center gap-2 text-sm"><input type="radio" name="opdeling" value="auto" class="accent-blue-500"' +
+    (opdelingTilstand === 'auto' ? ' checked' : '') + '> Regn hver mulighed for sig</label>' +
+    '<label class="flex items-center gap-2 text-sm"><input type="radio" name="opdeling" value="samlet" class="accent-blue-500"' +
+    (opdelingTilstand === 'samlet' ? ' checked' : '') + '> Det hele er én beregning</label>' +
+    '</div></div>';
+}
+
+// Hvad mangler for at beregningen kan staa alene?
+function tegnTjekliste() {
+  const boks = $('#tjekliste');
+  if (!boks) return;
+  if (!fund.length) { boks.innerHTML = ''; return; }
+  const har = t => fund.some(f => f.type === t);
+  const punkter = [
+    { navn: 'Rumfang eller mål på kolli', ok: har('kolli') || har('volumen') || har('maengde') || har('container'),
+      note: 'Uden rumfang kan volumenvægten ikke kontrolleres.' },
+    { navn: 'Vægt', ok: har('vaegt'), note: 'Uden vægt hviler den fragtpligtige vægt alene på rumfanget, og gebyrer pr. 100 kg bliver 0.' },
+    { navn: 'Grundfragt', ok: har('tiers') || har('wmFragt') || har('fastFragt'),
+      note: 'Selve fragtprisen er ikke fundet. Skriv den ind under punkt C.' },
+    { navn: 'Valutakurs', ok: har('kurs') || !fund.some(f => f.data && f.data.valuta && f.data.valuta !== 'DKK'),
+      note: 'Der er beløb i fremmed valuta, men ingen kurs. Udfyld den under punkt F.' },
+    { navn: 'Tillæg og gebyrer', ok: fund.some(f => f.type === 'linje'), note: 'Ingen tillæg fundet. Tjek casen for BAF, CAF, THC og lignende.' },
+    { navn: 'Vareværdi', ok: har('vareVaerdi') || har('vareVaerdiPrKolli'), note: 'Uden vareværdi kan forsikring, fragtrate og kapitalbinding ikke beregnes.' }
+  ];
+  const mangler = punkter.filter(x => !x.ok);
+  boks.innerHTML = '<div class="border border-[#1e2836] rounded-xl p-3">' +
+    '<div class="text-sm font-semibold mb-2">Tjekliste</div>' +
+    '<div class="grid sm:grid-cols-2 gap-x-6 gap-y-1">' +
+    punkter.map(x => '<div class="text-sm ' + (x.ok ? 'text-slate-300' : 'text-amber-300') + '">' +
+      (x.ok ? '<span class="text-emerald-400">&#10004;</span> ' : '<span>!</span> ') + esc(x.navn) + '</div>').join('') +
+    '</div>' +
+    (mangler.length ? '<div class="mt-3 space-y-1">' + mangler.map(x =>
+      '<div class="text-[11px] text-slate-400">' + esc(x.navn) + ': ' + esc(x.note) + '</div>').join('') + '</div>' : '') +
+    '</div>';
+}
+
 function fundKort(f) {
   return '<label class="flex items-start gap-3 border rounded-xl p-3 cursor-pointer hover:border-slate-600 ' +
     (f.konflikt ? 'border-amber-900' : 'border-[#1e2836]') + (f.usikker ? ' opacity-70' : '') + '" data-id="' + f.id + '">' +
@@ -1862,6 +1997,8 @@ function fundKort(f) {
 
 function tegnFund() {
   $('#fundAntal').textContent = fund.length + ' fund';
+  tegnOpdeling();
+  tegnTjekliste();
   if (!fund.length) { $('#fundListe').innerHTML = '<div class="text-sm text-slate-400">Ingen værdier fundet endnu. Upload en case eller indsæt teksten ovenfor.</div>'; return; }
 
   let h = '';
@@ -1931,6 +2068,7 @@ function byggStateFraFund(valgte, navn, grund) {
   const ff = valgte.find(f => f.type === 'fastFragt');
   if (ff && !ti && !wm) { s.fragtType = 'fast'; s.fastFragt = ff.data.sats; s.mode = 'soe'; s.faktor = 1000; if (ff.data.valuta) s.valutaFragt = ff.data.valuta; }
 
+  s.kursFundet = valgte.filter(f => f.type === 'kurs').map(f => String(f.data.valuta).toUpperCase());
   valgte.filter(f => f.type === 'kurs').forEach(f => {
     const kode = String(f.data.valuta).toUpperCase();
     if (kode === 'DKK') return;
@@ -1998,7 +2136,7 @@ function indsaetFund() {
   if (!valgte.length) { alert('Vælg mindst én værdi først.'); return; }
 
   const faelles = valgte.filter(f => !f.afsnit);
-  const mulige = afsnitListe.filter(a => valgte.some(f => f.afsnit === a.nr));
+  const mulige = opdelingTilstand === 'samlet' ? [] : afsnitListe.filter(a => valgte.some(f => f.afsnit === a.nr));
 
   if (mulige.length > 1) {
     // Casen har flere transportmuligheder. Hver mulighed regnes for sig,
@@ -2244,6 +2382,11 @@ function bind() {
     const id = e.target.closest('[data-id]').dataset.id;
     const f = fund.find(x => x.id === id); if (f) f.valgt = e.target.checked;
   });
+  $('#opdeling').addEventListener('change', e => {
+    if (e.target.name !== 'opdeling') return;
+    opdelingTilstand = e.target.value;
+  });
+
   $('#vaelgAlle').addEventListener('click', () => {
     const alle = fund.every(f => f.valgt);
     fund.forEach(f => f.valgt = !alle);

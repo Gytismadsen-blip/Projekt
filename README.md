@@ -13,6 +13,13 @@ med faste søgemønstre — mål på kolli, vægt, Q-satser, minimumssats, till�
 vareværdi og transporttid. Hvert fund vises med det tekststykke, det stammer fra, så det kan kontrolleres.
 Du sætter selv flueben ved det, der skal med, og trykker derefter Sæt ind i beregningen.
 
+Casen deles op i transportmuligheder, hvis den stiller flere tilbud op mod hinanden, og hver mulighed
+regnes for sig. Passer opdelingen ikke, kan du med ét klik vælge at regne det hele som én beregning.
+
+En tjekliste viser hvad der mangler: rumfang, vægt, grundfragt, valutakurs, tillæg og vareværdi.
+Siden gætter ikke stiltiende. Er kursen ikke oplyst i casen, siger den det, i stedet for at bruge en
+standardkurs uden at nævne det.
+
 Fund der er usikre, er markeret og fravalgt på forhånd. Finder siden flere forskellige værdier for det samme,
 fx fem transporttider fordi casen stiller fem tilbud op mod hinanden, markeres de, og kun den første er valgt.
 
