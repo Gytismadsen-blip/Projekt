@@ -1577,8 +1577,24 @@ const ENHED = '(?:kg|kilo(?:gram)?|tons?|gram|m3|m³|cbm|cm|mm|meter|liter|' +
   'forsendelser?|shipments?|transports?|afgange?|departures?|ordrer?|orders?|' +
   'kroner|euro|dollars?|DKK|USD|EUR|GBP)';
 
+// Dansk "to" og "fire" er ogsaa engelske ord med en helt anden betydning.
+// I en engelsk tekst maa de aldrig laeses som tal, ellers bliver
+// "to handle its transport" til "2 handle its transport".
+const TVETYDIGE = ['to', 'fire'];
+
+function sprogAf(tekst) {
+  const t = String(tekst).slice(0, 40000);
+  const da = (t.match(/\b(og|ikke|til|af|på|som|der|den|det|kan|skal|være|har|med|for)\b/gi) || []).length;
+  const en = (t.match(/\b(the|and|of|is|are|with|that|this|from|which|have|was|were|been)\b/gi) || []).length;
+  if (en > da * 1.2) return 'en';
+  if (da > en * 1.2) return 'da';
+  return 'mix';
+}
+
 function normaliserTaltekst(tekst) {
-  const ord = Object.keys(TALORD).sort((a, b) => b.length - a.length).join('|');
+  const sprog = sprogAf(tekst);
+  const brugbare = Object.keys(TALORD).filter(o => sprog === 'da' || TVETYDIGE.indexOf(o) < 0);
+  const ord = brugbare.sort((a, b) => b.length - a.length).join('|');
   let t = String(tekst);
 
   // 1. multiplikatorer: "to hundrede kasser", "tre tusind kroner"
@@ -1594,8 +1610,9 @@ function normaliserTaltekst(tekst) {
   t = t.replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[\s-](one|two|three|four|five|six|seven|eight|nine)\b/gi,
     (hel, a, b) => String(TALORD[a.toLowerCase()] + TALORD[b.toLowerCase()]));
 
-  // 3. enkeltord, men kun naar en enhed foelger inden for to ord
-  t = t.replace(new RegExp('\\b(' + ord + ')\\b(?=(?:\\s+[\\wæøåÆØÅ.-]+){0,2}\\s+' + ENHED + '\\b)', 'gi'),
+  // 3. enkeltord, men kun naar en enhed staar lige efter eller ét ord senere,
+  //    og aldrig naar det naeste er et tal ("up to 1000 kg" er ikke to tusinde)
+  t = t.replace(new RegExp('\\b(' + ord + ')\\b(?!\\s+\\d)(?=(?:\\s+[a-zæøåA-ZÆØÅ][\\wæøåÆØÅ.-]*)?\\s+' + ENHED + '\\b)', 'gi'),
     (hel, o) => { const n = TALORD[o.toLowerCase()]; return n === undefined ? hel : String(n); });
 
   return t;
