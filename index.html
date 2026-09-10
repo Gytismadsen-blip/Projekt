@@ -258,10 +258,10 @@
       </table>
     </div>
     <div class="mt-2 flex flex-wrap gap-2 items-center">
-      <input id="nyValutaKode" class="w-24 uppercase" placeholder="fx GBP" maxlength="4">
-      <input id="nyValutaKurs" class="num w-24" placeholder="kurs">
+      <select id="nyValutaKode" class="text-sm"></select>
+      <input id="nyValutaKurs" class="num w-28" placeholder="kurs i DKK">
       <button id="tilfoejValuta" class="text-sm bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg">+ Tilføj valuta</button>
-      <span class="text-xs text-slate-500">DKK er grundvalutaen og har altid kurs 1,00.</span>
+      <span class="text-xs text-slate-500">DKK er grundvalutaen og har altid kurs 1,00. Kursen skriver du selv, så den passer til casen.</span>
     </div>
   </div>
 
@@ -520,6 +520,16 @@ function saetKurs(kode, kurs) {
   const r = state.valutaer.find(v => String(v.kode).toUpperCase() === kode);
   if (r) r.kurs = kurs; else state.valutaer.push({ kode: kode, kurs: kurs });
 }
+function tegnValutaListe() {
+  const v = $('#nyValutaKode');
+  if (!v) return;
+  const brugte = valutaKoder();
+  const ledige = KENDTE_VALUTAER.filter(k => k !== 'DKK' && brugte.indexOf(k) < 0);
+  const valgt = v.value;
+  v.innerHTML = ledige.map(k => '<option value="' + k + '">' + k + ' — ' + (VALUTA_NAVNE[k] || k) + '</option>').join('');
+  if (ledige.indexOf(valgt) >= 0) v.value = valgt;
+}
+
 function tegnValutaer() {
   const rows = (state.valutaer || []).map((v, i) =>
     '<tr data-i="' + i + '">' +
@@ -528,6 +538,7 @@ function tegnValutaer() {
     '<td class="text-slate-500 text-xs">' + fmt(num(v.kurs) * 100) + '</td>' +
     '<td><button class="sletValuta text-slate-500 hover:text-red-400 px-2">&#10005;</button></td></tr>').join('');
   $('#valutaRows').innerHTML = '<tr class="text-slate-500"><td class="font-medium">DKK</td><td class="num pl-3">1,00</td><td class="text-xs">100</td><td></td></tr>' + rows;
+  tegnValutaListe();
 }
 
 function nyLinje(o) {
@@ -915,7 +926,7 @@ function hentScenarier() { try { return JSON.parse(localStorage.getItem('fragt_s
 function gemScenarier(a) { try { localStorage.setItem('fragt_scenarier', JSON.stringify(a)); } catch (e) {} }
 
 function tegnSammenlign() {
-  const arr = hentScenarier();
+  const arr = scenarierForCase();
   if (!arr.length) {
     $('#sammenlignBoks').innerHTML = '<div class="text-sm text-slate-400">Ingen muligheder gemt endnu. Lav en beregning og tryk "Gem som mulighed".</div>';
     $('#pointBoks').innerHTML = '';
@@ -994,7 +1005,7 @@ function tegnPoint(arr) {
 function tegnMuligheder() {
   const boks = $('#muligheder');
   if (!boks) return;
-  const arr = hentScenarier();
+  const arr = scenarierForCase();
   if (arr.length < 2) { boks.innerHTML = ''; return; }
   const mindst = Math.min.apply(null, arr.map(x => x.total));
   boks.innerHTML = '<div class="text-xs text-slate-400 mb-2">Der er ' + arr.length +
@@ -1061,6 +1072,7 @@ function aabnGemtCase(i) {
   fund = c.fund || [];
   afsnitListe = c.afsnit || [];
   opdelingTilstand = c.opdeling || 'auto';
+  aktivCase = (c.scenarier || []).length ? ((c.scenarier[0] || {}).case || '') : (caseNavnFraFiler() || '');
   gemScenarier(c.scenarier || []);
   $('#filListe').innerHTML = '<div class="text-slate-300 text-sm">Hentet fra gemte cases: ' + esc(c.navn) +
     (c.afkortet ? ' <span class="text-amber-300 text-[11px]">(teksten var for lang og blev afkortet, da den blev gemt)</span>' : '') + '</div>';
@@ -1977,6 +1989,13 @@ function markerKonflikter(liste) {
 
 
 const VALUTA_TEGN = { '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY' };
+const VALUTA_NAVNE = {
+  EUR: 'Euro', USD: 'Amerikanske dollar', GBP: 'Britiske pund', SEK: 'Svenske kroner',
+  NOK: 'Norske kroner', CHF: 'Schweizerfranc', PLN: 'Polske zloty', CNY: 'Kinesiske yuan',
+  JPY: 'Japanske yen', CAD: 'Canadiske dollar', AUD: 'Australske dollar', CZK: 'Tjekkiske koruna',
+  HUF: 'Ungarske forint', RON: 'Rumænske leu', TRY: 'Tyrkiske lira', SGD: 'Singapore dollar',
+  HKD: 'Hongkong dollar', INR: 'Indiske rupee', THB: 'Thailandske baht'
+};
 const KENDTE_VALUTAER = ['USD', 'EUR', 'GBP', 'SEK', 'NOK', 'CHF', 'PLN', 'CNY', 'JPY', 'CAD', 'AUD', 'CZK', 'HUF', 'RON', 'TRY', 'SGD', 'HKD', 'INR', 'THB', 'DKK'];
 function valutaAf(s) {
   if (!s) return '';
@@ -2207,6 +2226,23 @@ function byggStateFraFund(valgte, navn, grund) {
   return s;
 }
 
+// Navnet paa den case, der ligger i maskinen lige nu. Beregnede muligheder
+// stemples med det, saa to cases aldrig staar side om side.
+let aktivCase = '';
+
+function caseNavnFraFiler() {
+  const m = samletTekst.match(/=====\s*(.+?)\s*=====/);
+  if (!m) return '';
+  return m[1].trim().replace(/\.(docx|pdf|xlsx|pptx|txt|csv|md)$/i, '').trim();
+}
+
+// Kun de muligheder der hoerer til den aktuelle case
+function scenarierForCase() {
+  const alle = hentScenarier();
+  if (!aktivCase) return alle.filter(x => !x.case);
+  return alle.filter(x => (x.case || '') === aktivCase);
+}
+
 function gaaTilFane(navn) {
   const b = $$('.tabbtn').find(x => x.dataset.tab === navn);
   if (b) b.click();
@@ -2219,10 +2255,16 @@ function indsaetFund() {
   const faelles = valgte.filter(f => !f.afsnit);
   const mulige = opdelingTilstand === 'samlet' ? [] : afsnitListe.filter(a => valgte.some(f => f.afsnit === a.nr));
 
+  // Muligheder hoerer til én case. Er der lagt en ny case ind, ryddes de gamle.
+  const casenavn = caseNavnFraFiler() || 'Beregning';
+  let start = hentScenarier();
+  if (aktivCase && aktivCase !== casenavn) { start = []; gemScenarier([]); }
+  aktivCase = casenavn;
+
   if (mulige.length > 1) {
     // Casen har flere transportmuligheder. Hver mulighed regnes for sig,
     // med casens faelles vilkaar lagt oveni, og gemmes til sammenligning.
-    const arr = hentScenarier();
+    const arr = start;
     let foerste = null;
     mulige.forEach(a => {
       const st = byggStateFraFund(faelles.concat(valgte.filter(f => f.afsnit === a.nr)), a.navn);
@@ -2230,7 +2272,7 @@ function indsaetFund() {
       const gemtState = state;
       state = st;
       const r = beregn();
-      arr.push({ navn: a.navn, beskrivelse: a.beskrivelse || '', mode: MODES[st.mode].navn, vaegt: r.fragtpligtig, total: r.total,
+      arr.push({ navn: a.navn, beskrivelse: a.beskrivelse || '', case: casenavn, mode: MODES[st.mode].navn, vaegt: r.fragtpligtig, total: r.total,
         kapital: r.kapitalbinding, tid: num(st.transportTid), frekvens: num(st.frekvens),
         paalidelighed: num(st.paalidelighed), co2: r.co2, volumen: r.volumen * r.antal,
         erKapacitet: !!st.volumenErKapacitet,
@@ -2242,7 +2284,7 @@ function indsaetFund() {
     fyldFormular();
     gaaTilFane('sammenlign');
   } else {
-    state = byggStateFraFund(valgte, state.caseNavn || 'Beregning fra case');
+    state = byggStateFraFund(valgte, casenavn === 'Beregning' ? 'Beregning fra case' : casenavn);
     fyldFormular();
     gaaTilFane('beregner');
   }
@@ -2333,19 +2375,19 @@ function bind() {
     fyldFormular();
   });
   $('#tilfoejValuta').addEventListener('click', () => {
-    const kode = $('#nyValutaKode').value.trim().toUpperCase(), kurs = num($('#nyValutaKurs').value);
-    if (!/^[A-Z]{2,4}$/.test(kode)) { alert('Skriv en valutakode med 2 til 4 bogstaver, fx GBP.'); return; }
-    if (kode === 'DKK') { alert('DKK er grundvalutaen og har altid kurs 1,00.'); return; }
-    if (kurs <= 0) { alert('Skriv kursen for 1 ' + kode + ' i DKK, fx 8,60.'); return; }
+    const kode = String($('#nyValutaKode').value || '').trim().toUpperCase();
+    const kurs = num($('#nyValutaKurs').value);
+    if (!kode) { alert('Der er ikke flere valutaer at vælge.'); return; }
+    if (kurs <= 0) { alert('Skriv kursen for 1 ' + kode + ' i DKK. Den står i casen, fx 6,00 for en dollar.'); return; }
     saetKurs(kode, kurs);
-    $('#nyValutaKode').value = ''; $('#nyValutaKurs').value = '';
+    $('#nyValutaKurs').value = '';
     fyldFormular();
   });
 
   $('#muligheder').addEventListener('click', e => {
     const b = e.target.closest('.mulighedKnap');
     if (!b) return;
-    const arr = hentScenarier();
+    const arr = scenarierForCase();
     const valgt = arr[+b.dataset.i];
     if (!valgt) return;
     state = JSON.parse(JSON.stringify(valgt.state));
@@ -2431,7 +2473,8 @@ function bind() {
 
   $('#gemScenarie').addEventListener('click', () => {
     const r = beregn(), arr = hentScenarier();
-    arr.push({ navn: state.caseNavn || 'Uden navn', mode: MODES[state.mode].navn, vaegt: r.fragtpligtig, total: r.total,
+    if (!aktivCase) aktivCase = caseNavnFraFiler() || state.caseNavn || 'Beregning';
+    arr.push({ navn: state.caseNavn || 'Uden navn', case: aktivCase, mode: MODES[state.mode].navn, vaegt: r.fragtpligtig, total: r.total,
       kapital: r.kapitalbinding, tid: num(state.transportTid), frekvens: num(state.frekvens),
       paalidelighed: num(state.paalidelighed), co2: r.co2, volumen: r.volumen * r.antal,
       erKapacitet: !!state.volumenErKapacitet, prosa: state.prosa || '', state: JSON.parse(JSON.stringify(state)) });
@@ -2448,11 +2491,17 @@ function bind() {
   });
 
   $('#sammenlignBoks').addEventListener('click', e => {
-    const h = e.target.closest('.hentSc'), d = e.target.closest('.sletSc'), arr = hentScenarier();
-    if (h) { state = arr[+h.dataset.i].state; fyldFormular(); $$('.tabbtn').find(b => b.dataset.tab === 'beregner').click(); }
-    if (d) { arr.splice(+d.dataset.i, 1); gemScenarier(arr); tegnSammenlign(); }
+    const h = e.target.closest('.hentSc'), d = e.target.closest('.sletSc'), arr = scenarierForCase();
+    if (h) { state = JSON.parse(JSON.stringify(arr[+h.dataset.i].state)); fyldFormular(); $$('.tabbtn').find(b => b.dataset.tab === 'beregner').click(); }
+    if (d) {
+      const alle = hentScenarier();
+      const idx = alle.indexOf(arr[+d.dataset.i]);
+      if (idx >= 0) alle.splice(idx, 1);
+      gemScenarier(alle);
+      tegnSammenlign();
+    }
   });
-  $$('.vaegtInput').forEach(i => i.addEventListener('input', () => tegnPoint(hentScenarier())));
+  $$('.vaegtInput').forEach(i => i.addEventListener('input', () => tegnPoint(scenarierForCase())));
 
   // filer
   const drop = $('#drop');
@@ -2477,8 +2526,15 @@ function bind() {
   });
 
   $('#rydFiler').addEventListener('click', () => {
-    if (fund.length && !confirm('Ryd alle uploadede filer og fundne værdier? Dine gemte muligheder under Sammenlign bevares.')) return;
-    fund = []; afsnitListe = []; samletTekst = ''; opdelingTilstand = 'auto';
+    const antalMul = hentScenarier().length;
+    if ((fund.length || antalMul) && !confirm('Ryd alt?' + String.fromCharCode(10) + String.fromCharCode(10) +
+      'Uploadede filer, fundne værdier' + (antalMul ? ' og ' + antalMul + ' beregnede muligheder' : '') +
+      ' bliver ryddet. Gemte cases bliver liggende.')) return;
+    fund = []; afsnitListe = []; samletTekst = ''; opdelingTilstand = 'auto'; aktivCase = '';
+    gemScenarier([]);
+    state = tomState();
+    fyldFormular();
+    tegnSammenlign();
     $('#filListe').innerHTML = '';
     $('#raaTekst').value = '';
     $('#tekstDump').textContent = '';
