@@ -110,6 +110,9 @@
       <label class="text-sm text-slate-400">Navn på beregning</label>
       <input id="caseNavn" class="flex-1 min-w-[200px]" placeholder="fx Air Birgers Møbler, mulighed 1">
       <button id="beregnKnap" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded-lg font-medium text-sm">Beregn</button>
+      <label class="text-sm text-slate-400">Virksomhed</label>
+      <input id="virksomhed" class="w-44" list="virksomhedsListe" autocomplete="off" placeholder="fx Birgers Furniture">
+      <datalist id="virksomhedsListe"></datalist>
       <label class="text-sm text-slate-400">Antal forsendelser</label>
       <input id="antalForsendelser" class="num w-20" value="1">
     </div>
@@ -156,9 +159,25 @@
     </div>
   </div>
 
+  <!-- Leveringsbetingelse -->
+  <div class="card p-4">
+    <h2 class="font-semibold mb-1"><span class="text-blue-400">B.</span> Leveringsbetingelse (Incoterms)</h2>
+    <p class="text-xs text-slate-400 mb-3">Leveringsbetingelsen afgør, hvem der betaler hvad, hvor risikoen går over, og hvem der skal forsikre. Den bestemmer altså, hvilke af posterne i beregningen der overhovedet er dine.</p>
+    <div class="flex flex-wrap gap-4 items-end">
+      <div><div class="text-xs text-slate-400 mb-1">Klausul</div><select id="incoterm" class="text-sm"></select></div>
+      <div class="flex-1 min-w-[160px]"><div class="text-xs text-slate-400 mb-1">Navngivet sted</div><input id="incotermSted" class="w-full" placeholder="fx Bangkok Airport"></div>
+      <div><div class="text-xs text-slate-400 mb-1">Version</div>
+        <select id="incotermVersion" class="text-sm">
+          <option value="">ikke oplyst</option><option>2020</option><option>2010</option><option>2000</option>
+        </select>
+      </div>
+    </div>
+    <div id="incotermForklaring" class="mt-4"></div>
+  </div>
+
   <!-- 2. Transportform -->
   <div class="card p-4">
-    <h2 class="font-semibold mb-1"><span class="text-blue-400">B.</span> Transportform og fragtpligtig vægt</h2>
+    <h2 class="font-semibold mb-1"><span class="text-blue-400">C.</span> Transportform og fragtpligtig vægt</h2>
     <p class="text-xs text-slate-400 mb-3">Transportøren afregner efter det største: den faktiske vægt eller rumfanget omregnet til vægt. Det er w/m-reglen, weight or measure.</p>
     <div class="flex flex-wrap gap-4 items-end">
       <div><div class="text-xs text-slate-400 mb-1">Transportform</div><select id="mode" class="text-sm"></select></div>
@@ -177,7 +196,7 @@
 
   <!-- 3. Grundfragt -->
   <div class="card p-4">
-    <h2 class="font-semibold mb-1"><span class="text-blue-400">C.</span> Grundfragt</h2>
+    <h2 class="font-semibold mb-1"><span class="text-blue-400">D.</span> Grundfragt</h2>
     <div class="flex flex-wrap gap-4 items-end mb-3">
       <div>
         <div class="text-xs text-slate-400 mb-1">Hvordan er prisen sat?</div>
@@ -212,7 +231,7 @@
 
   <!-- 4. Tillæg -->
   <div class="card p-4">
-    <h2 class="font-semibold mb-1"><span class="text-blue-400">D.</span> Tillæg, gebyrer og for-/eftertransport</h2>
+    <h2 class="font-semibold mb-1"><span class="text-blue-400">E.</span> Tillæg, gebyrer og for-/eftertransport</h2>
     <p class="text-xs text-slate-400 mb-3">Fx brændstoftillæg, BAF, CAF, THC, ISPS, AMS, told, forsikring, formidlingsgebyr og transport til og fra terminalen.</p>
     <div class="mb-3 text-sm flex flex-wrap gap-4 items-end">
       <div>
@@ -233,7 +252,7 @@
 
   <!-- 5. Service -->
   <div class="card p-4">
-    <h2 class="font-semibold mb-1"><span class="text-blue-400">E.</span> Leveringsservice, kapitalbinding og CO2</h2>
+    <h2 class="font-semibold mb-1"><span class="text-blue-400">F.</span> Leveringsservice, kapitalbinding og CO2</h2>
     <p class="text-xs text-slate-400 mb-3">Prisen alene afgør sjældent valget. Disse tal bruges i nøgletal og i sammenligningen.</p>
     <div class="flex flex-wrap gap-4 items-end">
       <div><div class="text-xs text-slate-400 mb-1">Transporttid (dage)</div><input id="transportTid" class="num w-24" value="0"></div>
@@ -247,7 +266,7 @@
 
   <!-- 6. Kurser -->
   <div class="card p-4">
-    <h2 class="font-semibold mb-1"><span class="text-blue-400">F.</span> Valutakurser</h2>
+    <h2 class="font-semibold mb-1"><span class="text-blue-400">G.</span> Valutakurser</h2>
     <p class="text-xs text-slate-400 mb-3">
       Alt regnes om til DKK med kurserne herunder. Tilføj de valutaer, din case bruger.
       Danske opgaver angiver ofte kursen pr. 100 enheder, fx &laquo;kurs 745,00&raquo;, hvilket betyder 7,45 DKK pr. euro. Skriv altid kursen pr. 1 enhed her.
@@ -506,6 +525,8 @@ function tomState() {
     tiers: [{ fra: 0, sats: 0 }], minFragt: 0, brugBreakpoint: true,
     wmSats: 0, fastFragt: 0,
     tillaegBasis: 'fragtpligtig', linjer: [],
+    virksomhed: '', virksomhedKandidater: [],
+    incoterm: '', incotermSted: '', incotermVersion: '',
     transportTid: 0, frekvens: 0, paalidelighed: 3, afstand: 0, co2Faktor: 500, rente: 8,
     valutaer: [{ kode: 'USD', kurs: 6 }, { kode: 'EUR', kurs: 7.45 }]
   };
@@ -547,6 +568,103 @@ function tegnValutaer() {
 
 function nyLinje(o) {
   return Object.assign({ id: uid(), navn: '', aktiv: true, type: 'fast', valuta: 'DKK', sats: 0, sats2: 0, min: 0, gentag: true, pctRefs: [] }, o || {});
+}
+
+
+// ============================================================
+//  Incoterms. Klausulen afgoer, hvem der baerer hvilke omkostninger,
+//  hvor risikoen gaar over, og hvem der har forsikringspligten.
+// ============================================================
+const INCOTERMS = {
+  EXW: { navn: 'Ex Works', dansk: 'Ab fabrik', gruppe: 'E', form: 'alle', hovedtransport: 'køber',
+    risiko: 'hos sælger, når godset er stillet til rådighed på sælgers adresse',
+    forsikring: 'ingen part er forpligtet',
+    note: 'Køber betaler alt fra sælgers dør, også lastning og eksportklarering. Det er den klausul, der lægger mest på køber.' },
+  FCA: { navn: 'Free Carrier', dansk: 'Frit fragtfører', gruppe: 'F', form: 'alle', hovedtransport: 'køber',
+    risiko: 'ved overgivelse til den fragtfører, køber har udpeget, på det navngivne sted',
+    forsikring: 'ingen part er forpligtet',
+    note: 'Sælger klarerer til eksport og leverer til fragtføreren. Selve hovedtransporten og alt derefter betales af køber.' },
+  FAS: { navn: 'Free Alongside Ship', dansk: 'Frit langs skibssiden', gruppe: 'F', form: 'soe', hovedtransport: 'køber',
+    risiko: 'når godset er placeret langs skibssiden i afskibningshavnen',
+    forsikring: 'ingen part er forpligtet',
+    note: 'Kun til søtransport og indre vandveje.' },
+  FOB: { navn: 'Free On Board', dansk: 'Frit om bord', gruppe: 'F', form: 'soe', hovedtransport: 'køber',
+    risiko: 'når godset er om bord på skibet i afskibningshavnen',
+    forsikring: 'ingen part er forpligtet',
+    note: 'Kun til søtransport og indre vandveje. Bruges ofte fejlagtigt om containergods, hvor FCA er den rigtige.' },
+  CFR: { navn: 'Cost and Freight', dansk: 'Omkostninger og fragt', gruppe: 'C', form: 'soe', hovedtransport: 'sælger',
+    risiko: 'når godset er om bord i afskibningshavnen, altså før sælgers betalingsforpligtelse ophører',
+    forsikring: 'ingen part er forpligtet',
+    note: 'Sælger betaler fragten frem, men risikoen går over allerede ved lastning. Betalings- og risikoovergang falder ikke sammen.' },
+  CIF: { navn: 'Cost, Insurance and Freight', dansk: 'Omkostninger, forsikring og fragt', gruppe: 'C', form: 'soe', hovedtransport: 'sælger',
+    risiko: 'når godset er om bord i afskibningshavnen',
+    forsikring: 'sælger skal tegne forsikring, som minimum efter Institute Cargo Clauses C',
+    note: 'Kun til søtransport. Forsikringen er allerede med i prisen, så den må ikke lægges oveni igen.' },
+  CPT: { navn: 'Carriage Paid To', dansk: 'Fragt betalt til', gruppe: 'C', form: 'alle', hovedtransport: 'sælger',
+    risiko: 'ved overgivelse til den første fragtfører, altså længe før godset er fremme',
+    forsikring: 'ingen part er forpligtet',
+    note: 'Sælger betaler fragten frem til bestemmelsesstedet, men bærer ikke risikoen undervejs.' },
+  CIP: { navn: 'Carriage and Insurance Paid To', dansk: 'Fragt og forsikring betalt til', gruppe: 'C', form: 'alle', hovedtransport: 'sælger',
+    risiko: 'ved overgivelse til den første fragtfører',
+    forsikring: 'sælger skal tegne forsikring, efter Incoterms 2020 på det høje niveau Institute Cargo Clauses A',
+    note: 'Forsikringen er en del af prisen og skal ikke lægges til igen.' },
+  DAP: { navn: 'Delivered at Place', dansk: 'Leveret på stedet', gruppe: 'D', form: 'alle', hovedtransport: 'sælger',
+    risiko: 'hos sælger helt frem til det navngivne bestemmelsessted, klar til aflæsning',
+    forsikring: 'ingen part er forpligtet, men sælger bærer risikoen og vil normalt selv forsikre',
+    note: 'Køber står for aflæsning og importklarering.' },
+  DPU: { navn: 'Delivered at Place Unloaded', dansk: 'Leveret på stedet, aflæsset', gruppe: 'D', form: 'alle', hovedtransport: 'sælger',
+    risiko: 'hos sælger til og med aflæsningen på bestemmelsesstedet',
+    forsikring: 'ingen part er forpligtet, men sælger bærer risikoen',
+    note: 'Den eneste klausul, hvor sælger også skal aflæsse. Erstattede DAT i Incoterms 2020.' },
+  DDP: { navn: 'Delivered Duty Paid', dansk: 'Leveret told betalt', gruppe: 'D', form: 'alle', hovedtransport: 'sælger',
+    risiko: 'hos sælger helt frem til bestemmelsesstedet',
+    forsikring: 'ingen part er forpligtet, men sælger bærer risikoen',
+    note: 'Sælger betaler også told og afgifter ved import. Den klausul, der lægger mest på sælger.' },
+  DAT: { navn: 'Delivered at Terminal', dansk: 'Leveret på terminal', gruppe: 'D', form: 'alle', hovedtransport: 'sælger',
+    risiko: 'hos sælger til og med aflæsning på terminalen', forsikring: 'ingen part er forpligtet',
+    note: 'Fra Incoterms 2010. Erstattet af DPU i 2020.' },
+  DDU: { navn: 'Delivered Duty Unpaid', dansk: 'Leveret told ikke betalt', gruppe: 'D', form: 'alle', hovedtransport: 'sælger',
+    risiko: 'hos sælger frem til bestemmelsesstedet', forsikring: 'ingen part er forpligtet',
+    note: 'Fra Incoterms 2000. Erstattet af DAP. Ses stadig i ældre cases og kontrakter.' },
+  DAF: { navn: 'Delivered at Frontier', dansk: 'Leveret ved grænsen', gruppe: 'D', form: 'alle', hovedtransport: 'sælger',
+    risiko: 'hos sælger frem til den aftalte grænse', forsikring: 'ingen part er forpligtet',
+    note: 'Fra Incoterms 2000. Udgået.' },
+  DES: { navn: 'Delivered Ex Ship', dansk: 'Leveret ab skib', gruppe: 'D', form: 'soe', hovedtransport: 'sælger',
+    risiko: 'hos sælger til godset er til rådighed om bord i bestemmelseshavnen', forsikring: 'ingen part er forpligtet',
+    note: 'Fra Incoterms 2000. Udgået.' },
+  DEQ: { navn: 'Delivered Ex Quay', dansk: 'Leveret ab kaj', gruppe: 'D', form: 'soe', hovedtransport: 'sælger',
+    risiko: 'hos sælger til godset er losset på kajen', forsikring: 'ingen part er forpligtet',
+    note: 'Fra Incoterms 2000. Udgået.' }
+};
+
+function tegnIncoterm() {
+  const v = $('#incoterm');
+  if (!v) return;
+  const koder = Object.keys(INCOTERMS);
+  v.innerHTML = '<option value="">— ikke oplyst i casen —</option>' +
+    koder.map(k => '<option value="' + k + '">' + k + ' — ' + INCOTERMS[k].dansk + '</option>').join('');
+  v.value = state.incoterm || '';
+  $('#incotermSted').value = state.incotermSted || '';
+  $('#incotermVersion').value = state.incotermVersion || '';
+
+  const boks = $('#incotermForklaring');
+  const i = INCOTERMS[state.incoterm];
+  if (!i) {
+    boks.innerHTML = '<div class="border border-amber-800 bg-amber-950/20 rounded-xl p-3 text-sm text-slate-300">' +
+      'Der er ikke fundet en leveringsbetingelse i casen. Læs casen igennem for den. Står der ingen, må du selv vælge en og skrive det som en forudsætning. ' +
+      'Uden leveringsbetingelse kan du ikke vide, om fortransport, hovedtransport, terminalgebyrer, told og forsikring er dine omkostninger eller sælgers.</div>';
+    return;
+  }
+  const sted = state.incotermSted ? ' ' + state.incotermSted : '';
+  const rows = [
+    ['Klausul', state.incoterm + sted + (state.incotermVersion ? ', Incoterms ' + state.incotermVersion : '') + ' — ' + i.navn],
+    ['Hovedtransporten betales af', i.hovedtransport],
+    ['Risikoen går over', i.risiko],
+    ['Forsikring', i.forsikring]
+  ];
+  boks.innerHTML = '<table class="text-sm w-full"><tbody class="divide-y divide-[#1e2836]">' +
+    rows.map(x => '<tr><td class="text-slate-400 align-top w-52">' + esc(x[0]) + '</td><td>' + esc(x[1]) + '</td></tr>').join('') +
+    '</tbody></table><div class="text-xs text-slate-400 mt-2">' + esc(i.note) + '</div>';
 }
 
 // ============================================================
@@ -813,14 +931,14 @@ function tegnVurdering(r) {
   // valutakontrol: en post i fremmed valuta uden kurs bliver stille talt som 0 kr.
   const brugteVal = [state.valutaFragt].concat(state.linjer.filter(l => l.aktiv && l.type !== 'pct').map(l => l.valuta));
   const manglerKurs = Array.from(new Set(brugteVal)).filter(v => v && v !== 'DKK' && !(num(r.kurs[v]) > 0));
-  if (manglerKurs.length) add('advarsel', 'Der mangler en kurs for ' + manglerKurs.join(' og ') + '. Poster i den valuta tælles som 0 kr., så totalen er for lav. Udfyld kursen under punkt F.');
+  if (manglerKurs.length) add('advarsel', 'Der mangler en kurs for ' + manglerKurs.join(' og ') + '. Poster i den valuta tælles som 0 kr., så totalen er for lav. Udfyld kursen under punkt G.');
   if (state.kursFundet) {
     const gaettede = Array.from(new Set(brugteVal)).filter(v => v && v !== 'DKK' &&
       state.kursFundet.indexOf(v) < 0 && num(r.kurs[v]) > 0);
     if (gaettede.length) {
       add('advarsel', 'Casen oplyser ingen kurs for ' + gaettede.join(' og ') + '. Der regnes med standardkursen ' +
         gaettede.map(v => fmt(num(r.kurs[v])) + ' DKK pr. ' + v).join(' og ') +
-        ', som formentlig ikke er den, opgaven vil have. Find kursen i casen og ret den under punkt F.');
+        ', som formentlig ikke er den, opgaven vil have. Find kursen i casen og ret den under punkt G.');
     }
   }
   const store = (state.valutaer || []).filter(v => num(v.kurs) > 50);
@@ -859,7 +977,7 @@ function tegnVurdering(r) {
   if (num(state.transportTid) > 0 && r.vareVaerdi > 0) {
     add('info', 'Kapitalbindingen under transporten er ' + fmt(r.kapitalbinding) + ' DKK, svarende til ' + fmt(r.total > 0 ? r.kapitalbinding / r.total * 100 : 0, 1) + ' % af fragtprisen. En hurtigere løsning skal kun være billigere end fragtforskellen plus denne post for at være det rigtige valg.');
   } else if (r.vareVaerdi > 0) {
-    add('info', 'Udfyld transporttid under punkt E. Uden den kan kapitalbindingen ikke regnes med, og sammenligningen bliver kun en fragtprissammenligning.');
+    add('info', 'Udfyld transporttid under punkt F. Uden den kan kapitalbindingen ikke regnes med, og sammenligningen bliver kun en fragtprissammenligning.');
   }
 
   if (r.antal > 1) add('info', 'Der regnes med ' + r.antal + ' forsendelser. Faste gebyrer betales pr. forsendelse. Undersøg om færre og større forsendelser sænker totalen, og hold det op imod større lager og længere ordrecyklus.');
@@ -876,6 +994,32 @@ function tegnVurdering(r) {
   if (fradrag.length && procenter.length) {
     add('advarsel', 'Der er både et fradrag (' + fradrag.map(l => l.navn || 'uden navn').join(', ') +
       ') og et procenttillæg i beregningen. Så betyder rækkefølgen noget: regnes procenten af beløbet før eller efter fradraget? Casen siger det sjældent. Vælg selv, sæt fluebenene i procentlinjen derefter, og skriv din antagelse ind i besvarelsen.');
+  }
+
+  // --- leveringsbetingelsen ---
+  const inc2 = INCOTERMS[state.incoterm];
+  if (!inc2) {
+    add('advarsel', 'Der er ikke valgt en leveringsbetingelse. Uden Incoterms ved du ikke, om for- og eftertransport, terminalgebyrer, told og forsikring er dine omkostninger eller modpartens. Find klausulen i casen, eller vælg en selv og skriv det som en forudsætning under punkt B.');
+  } else {
+    if (inc2.form === 'soe' && state.mode !== 'soe') {
+      add('advarsel', state.incoterm + ' er en ren søfragtsklausul og passer ikke til ' + MODES[state.mode].navn.toLowerCase() +
+        '. Ved luft, bane og vej bruges i stedet FCA, CPT, CIP eller D-klausulerne. Det er en klassisk fejl, og den bliver bemærket.');
+    }
+    if (state.mode === 'soe' && inc2.form === 'soe' && r.antalKolli > 0 && (state.incoterm === 'FOB' || state.incoterm === 'CIF')) {
+      add('info', state.incoterm + ' er skrevet til stykgods, der lastes over skibssiden. Ved containergods, hvor godset afleveres på en terminal, er FCA eller CIP mere præcise.');
+    }
+    if (/sælger skal tegne forsikring/.test(inc2.forsikring) && state.linjer.some(l => l.aktiv && /forsikring|insurance/i.test(l.navn))) {
+      add('advarsel', 'Under ' + state.incoterm + ' skal sælger allerede forsikre godset, men der er også lagt en forsikringspost ind i beregningen. Så betaler du for forsikringen to gange.');
+    }
+    if (inc2.gruppe === 'E') {
+      add('info', 'Ved ' + state.incoterm + ' bærer køber alt fra sælgers adresse, også lastning og eksportklarering. Kontrollér, at de poster faktisk er med i beregningen.');
+    }
+    if (inc2.gruppe === 'C') {
+      add('info', 'Ved ' + state.incoterm + ' falder betalings- og risikoovergang ikke sammen. Sælger betaler fragten frem, men risikoen går over ' + inc2.risiko + '. Det er værd at nævne i en analyse.');
+    }
+    if (inc2.gruppe === 'D') {
+      add('info', 'Ved ' + state.incoterm + ' bærer sælger både omkostning og risiko frem til bestemmelsesstedet. Posterne i beregningen er derfor kun dine, hvis du regner fra sælgers side.');
+    }
   }
 
   add('info', 'Husk leveringsbetingelsen. Incoterms afgør hvem der betaler og bærer risikoen på hver strækning, og dermed hvilke af posterne ovenfor der overhovedet er dine.');
@@ -1245,6 +1389,48 @@ function ingenBeregningEndnu() {
 // Konklusion naar der kun er regnet paa én loesning. Der er ikke noget at
 // sammenligne med, saa der skrives i stedet, hvad tallene selv fortaeller.
 // Ruten, saa konklusionen kan skrives "fra Bangkok til Rønne"
+// Hvem handler casen om? Konklusionen skal tale til en virksomhed,
+// ikke til "casen". Navnet kan altid rettes i hånden.
+const SELSKABSFORM = /\b(A\/S|ApS|A\.m\.b\.a\.|I\/S|K\/S|Ltd\.?|Limited|Inc\.?|GmbH|AG|AB|BV|NV|SA|SpA|plc|Oy|LLC|Corp\.?)\b/;
+const IKKE_NAVN = /^(The|This|That|Her|Der|Det|Den|Som|For|And|But|Med|Ved|Hvis|When|While|After|Before|During|Case|Opgave|Task|Question|Bilag|Del|Table|Figur|Page|Side|Incoterms|Transport|Freight|Fragt)\b/i;
+
+function findVirksomhedKandidater(tekst) {
+  const t = String(tekst).slice(0, 30000);
+  const kandidater = {};
+  // to til tre ord med stort begyndelsesbogstav, eller ord med bindestreg og versaler
+  const re = /(?:^|[^\wæøåÆØÅ])([A-ZÆØÅ][\wæøåÆØÅ&.\-]{1,20}(?:[ \-][A-ZÆØÅ][\wæøåÆØÅ&.\-]{1,20}){0,2})/g;
+  let m;
+  while ((m = re.exec(t)) !== null) {
+    let navn = m[1].replace(/[.,;:]+$/, '').trim();
+    if (navn.length < 4 || IKKE_NAVN.test(navn)) continue;
+    // stednavne: staar typisk efter to, from, in, til, fra, i, via
+    const foran = t.slice(Math.max(0, m.index - 12), m.index).toLowerCase();
+    if (/\b(to|from|in|at|via|til|fra|i|mod|near)\s*$/.test(foran)) continue;
+    const k = navn;
+    if (!kandidater[k]) kandidater[k] = { navn: k, antal: 0, foerste: m.index };
+    kandidater[k].antal++;
+  }
+  const liste = Object.keys(kandidater).map(k => kandidater[k]);
+  if (!liste.length) return '';
+  // Et firmanavn naevnes mere end én gang, eller har en selskabsform.
+  // Overskrifter og enkeltstaaende ord falder derved fra.
+  const brugbare = liste.filter(x => x.antal >= 2 || SELSKABSFORM.test(x.navn));
+  const endelig = brugbare.length ? brugbare : liste;
+  endelig.forEach(x => {
+    // Fragtfoerere og rederier naevnes
+    // ofte flere gange, men senere, saa placeringen vejer tungere end antallet.
+    x.point = Math.min(x.antal, 6);
+    if (x.foerste < 1200) x.point += 4;
+    if (SELSKABSFORM.test(x.navn)) x.point += 6;                    // A/S, Ltd, GmbH osv.
+    if (x.navn.split(/[ \-]/).length >= 2) x.point += 2;            // flerleddet navn
+    if (/^[A-ZÆØÅ\-]+$/.test(x.navn)) x.point += 1;                 // DAN-MEAT
+  });
+  endelig.sort((a, b) => b.point - a.point || a.foerste - b.foerste);
+  return endelig.slice(0, 5).map(x => x.navn);
+}
+
+function findVirksomhed(tekst) { const k = findVirksomhedKandidater(tekst); return k.length ? k[0] : ''; }
+
 function findRute(tekst) {
   const t = String(tekst);
   const m = t.match(/\bfrom\s+([A-ZÆØÅ][\wæøåÆØÅ.\-]{2,20})\s+to\s+([A-ZÆØÅ][\wæøåÆØÅ.\-]{2,20})/) ||
@@ -1265,7 +1451,8 @@ function prosaEnkelt(r, navn) {
   const kurs = r.kurs[val] || 1;
 
   // 1. hvad koster det, og hvad styrer vaegten
-  let p1 = 'Den samlede transportomkostning' + rute + ' er ' + fmt(r.total) + ' DKK' +
+  const virk = (s.virksomhed || '').trim();
+  let p1 = (virk ? 'For ' + virk + ' er den' : 'Den') + ' samlede transportomkostning' + rute + ' på ' + fmt(r.total) + ' DKK' +
     (r.antal > 1 ? ' for ' + r.antal + ' forsendelser, altså ' + fmt(r.total / r.antal) + ' DKK pr. forsendelse' : '') + '. ';
   if (r.faktiskVaegt > 0 && r.volumen > 0) {
     if (r.volumenVaegt > r.faktiskVaegt) {
@@ -1336,6 +1523,27 @@ function prosaEnkelt(r, navn) {
     af.push(p4);
   }
 
+  // 4b. leveringsbetingelsen
+  const inc = INCOTERMS[s.incoterm];
+  if (inc) {
+    const sted = s.incotermSted ? ' ' + s.incotermSted : '';
+    let pi = 'Leveringsbetingelsen er ' + s.incoterm + sted +
+      (s.incotermVersion ? ', Incoterms ' + s.incotermVersion : '') + ', altså ' + inc.navn + '. ' +
+      'Hovedtransporten betales af ' + inc.hovedtransport + ', og risikoen går over ' + inc.risiko + '. ';
+    if (/sælger skal tegne forsikring/.test(inc.forsikring)) {
+      pi += 'Forsikringen er en del af klausulen og dermed allerede indeholdt i prisen, så den skal ikke lægges til igen. ';
+    } else {
+      pi += 'Ingen af parterne er forpligtet til at forsikre, så det bør aftales særskilt, hvis godsets værdi taler for det. ';
+    }
+    pi += inc.note;
+    af.push(pi);
+  } else {
+    af.push('Der er ikke oplyst nogen leveringsbetingelse. Det er en væsentlig mangel, for Incoterms afgør, ' +
+      'hvem der betaler for- og eftertransport, terminalgebyrer, told og forsikring, og hvor risikoen går over. ' +
+      'Beregningen ovenfor forudsætter derfor, at samtlige poster er købers. Læs casen igennem for klausulen, ' +
+      'og skriv forudsætningen ind, hvis den ikke står nogen steder.');
+  }
+
   // 5. varens vaerdi
   if (r.vareVaerdi > 0) {
     const vpk = r.faktiskVaegt > 0 ? num(s.vareVaerdi) / r.faktiskVaegt : 0;
@@ -1357,7 +1565,9 @@ function prosaFlere(arr, billigst, rest, dyrest, kort) {
   // Bind listen sammen med 'og' til sidst. Der maa ikke roeres ved kommaerne i tallene.
   const dele = arr.map(x => kort(x.navn) + ' koster ' + fmt(x.total) + ' DKK');
   const liste = dele.length > 1 ? dele.slice(0, -1).join(', ') + ' og ' + dele[dele.length - 1] : dele[0];
-  af.push('Casen stiller ' + arr.length + ' transportmuligheder op mod hinanden. ' + liste + '.');
+  // Navnet tages fra det, der staar i feltet nu, saa en rettelse slaar igennem med det samme
+  const virk = (state.virksomhed || (arr[0] && arr[0].state && arr[0].state.virksomhed) || '').trim();
+  af.push((virk ? virk + ' har ' + arr.length + ' transportmuligheder at vælge imellem. ' : 'Der er ' + arr.length + ' transportmuligheder at vælge imellem. ') + liste + '.');
 
   af.push(kort(billigst.navn) + ' er dermed den billigste. Den er ' + fmt(rest[0].total - billigst.total) + ' DKK billigere end ' +
     kort(rest[0].navn) + (rest.length > 1 ? ' og ' + fmt(dyrest.total - billigst.total) + ' DKK billigere end ' + kort(dyrest.navn) : '') + '.');
@@ -1385,7 +1595,7 @@ function prosaFlere(arr, billigst, rest, dyrest, kort) {
     const stram = kap.filter(x => gods / num(x.volumen) > 0.85);
     const tom = kap.filter(x => gods / num(x.volumen) < 0.6);
     let p = '';
-    if (stram.length) p += 'Casen sender omkring ' + fmt(gods, 0) + ' m³, og ' + kort(stram[0].navn) + ' har ' +
+    if (stram.length) p += (virk ? virk + ' sender' : 'Der sendes') + ' omkring ' + fmt(gods, 0) + ' m³, og ' + kort(stram[0].navn) + ' har ' +
       fmt(num(stram[0].volumen), 0) + ' m³ kapacitet. Det er ' + fmt(gods / num(stram[0].volumen) * 100, 0) +
       ' % udnyttelse, altså helt op til kanten, og det bør kontrolleres, om godset overhovedet kan være i containeren. ';
     if (tom.length) p += kort(tom[0].navn) + ' har til gengæld ' + fmt(num(tom[0].volumen), 0) + ' m³ kapacitet og udnyttes kun ' +
@@ -1410,9 +1620,11 @@ function prosaFlere(arr, billigst, rest, dyrest, kort) {
     'så en forsikring bør indgå i vurderingen.';
   af.push(p5);
 
-  let p6 = 'Samlet set anbefales ' + kort(billigst.navn) + ' til ' + fmt(billigst.total) + ' DKK. ';
+  let p6 = virk
+    ? 'Samlet set vil jeg anbefale ' + virk + ' at vælge ' + kort(billigst.navn) + ' til ' + fmt(billigst.total) + ' DKK. '
+    : 'Samlet set anbefales ' + kort(billigst.navn) + ' til ' + fmt(billigst.total) + ' DKK. ';
   if (forbehold && citatB) {
-    p6 += 'Casen tager dog forbehold for netop denne løsning: «' + citatB + '» Kan den usikkerhed ikke accepteres, ' +
+    p6 += 'Der er dog taget forbehold for netop denne løsning: «' + citatB + '» Kan den usikkerhed ikke accepteres, ' +
       'koster den næstbilligste ' + fmt(rest[0].total - billigst.total) + ' DKK mere for større sikkerhed.';
   } else {
     p6 += 'Der er ikke i casen noget, der taler afgørende imod den, og de øvrige muligheder koster mere uden at give bedre service.';
@@ -1499,6 +1711,8 @@ function tegnKonklusion(arr) {
 function fyldFormular() {
   const s = state;
   $('#caseNavn').value = s.caseNavn;
+  $('#virksomhed').value = s.virksomhed || '';
+  $('#virksomhedsListe').innerHTML = (s.virksomhedKandidater || []).map(function (x) { return '<option value="' + esc(x) + '">'; }).join('');
   $('#antalForsendelser').value = s.antalForsendelser;
   $$('input[name=inputType]').forEach(r => r.checked = (r.value === s.inputType));
   visInputType();
@@ -1519,6 +1733,7 @@ function fyldFormular() {
   $('#wmSats').value = s.wmSats;
   $('#fastFragt').value = s.fastFragt;
   $('#tillaegBasis').value = s.tillaegBasis;
+  tegnIncoterm();
   $('#transportTid').value = s.transportTid;
   $('#frekvens').value = s.frekvens;
   $('#paalidelighed').value = s.paalidelighed;
@@ -2117,6 +2332,26 @@ function findVaerdier(tekst) {
       data: { antal: antalC, size: m[2] + (m[3] ? 'HC' : ''), m3: antalC * m3 } });
   }
 
+  // --- virksomheden casen handler om ---
+  const virkListe = findVirksomhedKandidater(t);
+  if (virkListe.length) push({ pos: 0, type: 'virksomhed', label: 'Virksomhed', vaerdi: virkListe[0],
+    kilde: 'forslag: ' + virkListe.join(', '), data: { navn: virkListe[0], kandidater: virkListe } });
+
+  // --- leveringsbetingelse ---
+  const incoRe = /\b(EXW|FCA|FAS|FOB|CFR|CIF|CPT|CIP|DAP|DPU|DDP|DAT|DDU|DAF|DES|DEQ)\b[ \t]*([A-ZÆØÅ][\wæøåÆØÅ' .\-]{1,40}?)?(?=[,.;:\n)]|\s+INCOTERMS|\s*$)/g;
+  while ((m = incoRe.exec(t)) !== null) {
+    const kode = m[1].toUpperCase();
+    const efter = t.slice(m.index, m.index + 160);
+    const foran = t.slice(Math.max(0, m.index - 60), m.index);
+    const ver = (efter.match(/INCOTERMS\s*(20\d{2}|19\d{2})/i) || [])[1] ||
+                (foran.match(/INCOTERMS\s*(20\d{2}|19\d{2})/i) || [])[1] || '';
+    let sted = (m[2] || '').trim().replace(/[,.;:]+$/, '');
+    if (/^(INCOTERMS|and|og|er|is|the)$/i.test(sted)) sted = '';
+    push({ pos: m.index, type: 'incoterm', label: 'Leveringsbetingelse',
+      vaerdi: kode + (sted ? ' ' + sted : '') + (ver ? ', Incoterms ' + ver : ''), kilde: m[0].trim(),
+      data: { kode: kode, sted: sted, version: ver } });
+  }
+
   // --- transporttid ---
   const tidRe = new RegExp('(?:transport(?:tid|time)|transit\\s*time|leveringstid|arrive[sd]?\\s*\\w*\\s*)\\D{0,25}' + N + '\\s*(dage|days|uger|weeks|dag|day|uge|week)', 'gi');
   while ((m = tidRe.exec(t)) !== null) {
@@ -2167,7 +2402,7 @@ function findVaerdier(tekst) {
 // Nogle felter kan kun have en vaerdi. Findes flere, markeres kun den foerste,
 // saa en case med flere tilbud ikke stille overskriver sig selv.
 function markerKonflikter(liste) {
-  const enkelt = ['vaegt', 'volumen', 'container', 'tid', 'tiers', 'minFragt', 'fastFragt', 'wmFragt', 'vareVaerdi', 'vareVaerdiPrKolli'];
+  const enkelt = ['vaegt', 'volumen', 'container', 'tid', 'tiers', 'minFragt', 'fastFragt', 'wmFragt', 'vareVaerdi', 'vareVaerdiPrKolli', 'incoterm'];
   // Konflikt gaelder kun inden for samme mulighed. To fragtsatser i hver sin
   // mulighed er ikke et valg mellem to tal - de skal begge bruges, hver sit sted.
   const noegle = x => (x.afsnit || 0) + '|' + (x.type === 'kurs' ? 'kurs:' + x.data.valuta : x.type);
@@ -2220,7 +2455,7 @@ function navnFor(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-const FUND_IKON = { kolli: '📦', vaegt: '⚖️', tiers: '📊', minFragt: '📊', linje: '💰', wmFragt: '🚢',
+const FUND_IKON = { virksomhed: '🏢', incoterm: '📜', kolli: '📦', vaegt: '⚖️', tiers: '📊', minFragt: '📊', linje: '💰', wmFragt: '🚢',
   fastFragt: '🚢', kurs: '💱', vareVaerdi: '🏷️', vareVaerdiPrKolli: '🏷️', volumen: '📐', tid: '⏱️' };
 
 
@@ -2254,11 +2489,12 @@ function tegnTjekliste() {
       note: 'Uden rumfang kan volumenvægten ikke kontrolleres.' },
     { navn: 'Vægt', ok: har('vaegt'), note: 'Uden vægt hviler den fragtpligtige vægt alene på rumfanget, og gebyrer pr. 100 kg bliver 0.' },
     { navn: 'Grundfragt', ok: har('tiers') || har('wmFragt') || har('fastFragt'),
-      note: 'Selve fragtprisen er ikke fundet. Skriv den ind under punkt C.' },
+      note: 'Selve fragtprisen er ikke fundet. Skriv den ind under punkt D.' },
     { navn: 'Valutakurs', ok: har('kurs') || !fund.some(f => f.data && f.data.valuta && f.data.valuta !== 'DKK'),
-      note: 'Der er beløb i fremmed valuta, men ingen kurs. Udfyld den under punkt F.' },
+      note: 'Der er beløb i fremmed valuta, men ingen kurs. Udfyld den under punkt G.' },
     { navn: 'Tillæg og gebyrer', ok: fund.some(f => f.type === 'linje'), note: 'Ingen tillæg fundet. Tjek casen for BAF, CAF, THC og lignende.' },
-    { navn: 'Vareværdi', ok: har('vareVaerdi') || har('vareVaerdiPrKolli'), note: 'Uden vareværdi kan forsikring, fragtrate og kapitalbinding ikke beregnes.' }
+    { navn: 'Vareværdi', ok: har('vareVaerdi') || har('vareVaerdiPrKolli'), note: 'Uden vareværdi kan forsikring, fragtrate og kapitalbinding ikke beregnes.' },
+    { navn: 'Leveringsbetingelse', ok: har('incoterm'), note: 'Ingen Incoterms-klausul fundet. Læs casen igennem for den, ellers ved du ikke, hvilke omkostninger der er dine.' }
   ];
   const mangler = punkter.filter(x => !x.ok);
   boks.innerHTML = '<div class="border border-[#1e2836] rounded-xl p-3">' +
@@ -2378,6 +2614,12 @@ function byggStateFraFund(valgte, navn, grund) {
     const antal = s.inputType === 'kolli' ? s.kolli.reduce((a, k) => a + num(k.antal), 0) : num(s.antalKolliDirekte);
     if (antal > 0) s.vareVaerdi = vvk.data.prKolli * antal;
   }
+
+  const vk = valgte.find(f => f.type === 'virksomhed');
+  if (vk) { s.virksomhed = vk.data.navn; s.virksomhedKandidater = vk.data.kandidater || []; }
+
+  const inco = valgte.find(f => f.type === 'incoterm');
+  if (inco) { s.incoterm = inco.data.kode; s.incotermSted = inco.data.sted; s.incotermVersion = inco.data.version; }
 
   const tid = valgte.find(f => f.type === 'tid');
   if (tid) s.transportTid = tid.data.dage;
@@ -2542,7 +2784,7 @@ function bind() {
     tegnResultat();
   });
 
-  const simple = ['caseNavn', 'antalForsendelser', 'volumenDirekte', 'antalKolliDirekte', 'vaegtTotal', 'vareVaerdi',
+  const simple = ['caseNavn', 'virksomhed', 'antalForsendelser', 'volumenDirekte', 'antalKolliDirekte', 'vaegtTotal', 'vareVaerdi',
     'faktor', 'minFragt', 'wmSats', 'fastFragt', 'transportTid', 'frekvens', 'paalidelighed', 'afstand', 'co2Faktor', 'rente'];
   simple.forEach(id => $('#' + id).addEventListener('input', e => { state[id] = e.target.value; tegnResultat(); }));
 
@@ -2594,6 +2836,10 @@ function bind() {
     setTimeout(() => { b.textContent = t; }, 1200);
     try { $('#resultat').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
   });
+
+  $('#incoterm').addEventListener('change', e => { state.incoterm = e.target.value; tegnIncoterm(); tegnResultat(); });
+  $('#incotermSted').addEventListener('input', e => { state.incotermSted = e.target.value; tegnIncoterm(); });
+  $('#incotermVersion').addEventListener('change', e => { state.incotermVersion = e.target.value; tegnIncoterm(); });
 
   $('#fragtType').addEventListener('change', e => { state.fragtType = e.target.value; visFragtBoks(); tegnResultat(); });
   $('#brugBreakpoint').addEventListener('change', e => { state.brugBreakpoint = e.target.checked; tegnResultat(); });
