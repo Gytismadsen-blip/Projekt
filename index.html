@@ -448,6 +448,9 @@ function fmt(n, d) {
   if (!isFinite(n)) n = 0;
   return n.toLocaleString('da-DK', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
+// Hele kilo skrives uden decimaler: 447 kg, ikke 447,00 kg
+function fmtKg(n) { return fmt(n, Math.abs(n - Math.round(n)) < 0.005 ? 0 : 2); }
+
 function uid() { return 'l' + Math.random().toString(36).slice(2, 9); }
 function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
@@ -1241,65 +1244,206 @@ function ingenBeregningEndnu() {
 
 // Konklusion naar der kun er regnet paa én loesning. Der er ikke noget at
 // sammenligne med, saa der skrives i stedet, hvad tallene selv fortaeller.
-function enkeltKonklusion(r, navn) {
-  const s = state;
-  const k = [];
-  const prKgFaktisk = r.faktiskVaegt > 0 ? r.total / (r.faktiskVaegt * r.antal) : 0;
-  const prM3 = r.volumen > 0 ? r.total / (r.volumen * r.antal) : 0;
-  const vaerdiPrKg = r.faktiskVaegt > 0 ? num(s.vareVaerdi) / r.faktiskVaegt : 0;
+// Ruten, saa konklusionen kan skrives "fra Bangkok til Rønne"
+function findRute(tekst) {
+  const t = String(tekst);
+  const m = t.match(/\bfrom\s+([A-ZÆØÅ][\wæøåÆØÅ.\-]{2,20})\s+to\s+([A-ZÆØÅ][\wæøåÆØÅ.\-]{2,20})/) ||
+            t.match(/\bfra\s+([A-ZÆØÅ][\wæøåÆØÅ.\-]{2,20})\s+til\s+([A-ZÆØÅ][\wæøåÆØÅ.\-]{2,20})/);
+  if (!m) return '';
+  const rens = x => String(x).replace(/[.,;:]+$/, '').trim();
+  return ' fra ' + rens(m[1]) + ' til ' + rens(m[2]);
+}
 
-  k.push({ type: 'ok', txt: navn + ' koster ' + fmt(r.total) + ' DKK i alt' +
-    (r.antal > 1 ? ', altså ' + fmt(r.total / r.antal) + ' DKK pr. forsendelse' : '') +
-    '. Der afregnes for ' + fmt(r.fragtpligtig) + ' kg fragtpligtig vægt' +
-    (r.volumen > 0 ? ' og ' + fmt(r.volumen, 3) + ' m³' : '') + '.' });
+// ------------------------------------------------------------
+//  Konklusionen skrives som sammenhaengende tekst, ikke som punkter,
+//  saa den kan bruges direkte i en besvarelse.
+// ------------------------------------------------------------
+function prosaEnkelt(r, navn) {
+  const s = state, af = [];
+  const rute = findRute(samletTekst);
+  const val = s.valutaFragt;
+  const kurs = r.kurs[val] || 1;
 
-  if (prKgFaktisk > 0) {
-    k.push({ type: 'info', txt: 'Det svarer til ' + fmt(prKgFaktisk) + ' DKK pr. kg gods' +
-      (prM3 > 0 ? ' og ' + fmt(prM3) + ' DKK pr. m³' : '') + '. Brug det tal, når du sammenligner med et andet tilbud, i stedet for fragtraten alene.' });
+  // 1. hvad koster det, og hvad styrer vaegten
+  let p1 = 'Den samlede transportomkostning' + rute + ' er ' + fmt(r.total) + ' DKK' +
+    (r.antal > 1 ? ' for ' + r.antal + ' forsendelser, altså ' + fmt(r.total / r.antal) + ' DKK pr. forsendelse' : '') + '. ';
+  if (r.faktiskVaegt > 0 && r.volumen > 0) {
+    if (r.volumenVaegt > r.faktiskVaegt) {
+      p1 += 'Godset vejer fysisk ' + fmtKg(r.faktiskVaegt) + ' kg, men fordi det fylder ' + fmt(r.volumen, 4) +
+        ' m³, bliver volumenvægten ' + fmtKg(r.volumenVaegt) + ' kg, oprundet til ' + fmtKg(r.fragtpligtig) +
+        ' kg. Det er derfor volumenvægten og ikke den faktiske vægt, der styrer fragtberegningen.';
+    } else {
+      p1 += 'Godset vejer ' + fmtKg(r.faktiskVaegt) + ' kg og fylder ' + fmt(r.volumen, 4) + ' m³, hvilket giver en volumenvægt på ' +
+        fmtKg(r.volumenVaegt) + ' kg. Den faktiske vægt er dermed størst og styrer fragtberegningen, som sker efter ' +
+        fmtKg(r.fragtpligtig) + ' kg.';
+    }
+  } else if (r.volumen > 0) {
+    p1 += 'Der afregnes efter ' + fmt(r.volumen, 3) + ' m³, svarende til ' + fmtKg(r.fragtpligtig) + ' kg fragtpligtig vægt.';
   }
+  af.push(p1);
 
-  if (r.volumenVaegt > r.faktiskVaegt && r.faktiskVaegt > 0) {
-    k.push({ type: 'advarsel', txt: 'Prisen styres af rumfanget, ikke af vægten. Der betales for ' +
-      fmt(r.volumenVaegt - r.faktiskVaegt) + ' kg luft. Bedre pakning eller stabling flytter derfor mere end en forhandling om fragtraten.' });
-  } else if (r.faktiskVaegt > 0 && r.volumen > 0) {
-    k.push({ type: 'info', txt: 'Prisen styres af vægten. Godset er tungt i forhold til sin plads, så bedre pakning sænker ikke fragten nævneværdigt.' });
-  }
-
-  if (s.fragtType === 'trappe' && r.valgt && !r.valgt.egen) {
+  // 2. hvordan grundfragten fastsaettes
+  if (s.fragtType === 'trappe' && r.valgt) {
     const egen = r.kandidater.find(x => x.egen);
-    k.push({ type: 'ok', txt: 'Der er udnyttet et break-point: der deklareres ' + fmt(r.valgt.vaegt) + ' kg i stedet for ' +
-      fmt(r.fragtpligtig) + ' kg' + (egen ? ', hvilket sparer ' + fmt(egen.belob - r.valgt.belob) + ' ' + s.valutaFragt : '') +
-      '. Skriv den begrundelse ind, ellers ser det ud som en regnefejl.' });
+    let p2 = '';
+    if (!r.valgt.egen && egen) {
+      p2 = 'Med en fragtpligtig vægt på ' + fmtKg(r.fragtpligtig) + ' kg falder forsendelsen i vægtklasse Q' + fmt(egen.fra, 0) +
+        ' til ' + fmt(egen.sats, 2) + ' ' + val + '/kg, hvilket giver ' + fmt(egen.belob) + ' ' + val +
+        '. Det er imidlertid billigere at deklarere ' + fmtKg(r.valgt.vaegt) + ' kg til Q' + fmt(r.valgt.fra, 0) + '-raten på ' +
+        fmt(r.valgt.sats, 2) + ' ' + val + '/kg, som giver ' + fmt(r.valgt.belob) + ' ' + val +
+        '. Der betales derfor for ' + fmtKg(r.valgt.vaegt) + ' kg, hvilket sparer ' + fmt(egen.belob - r.valgt.belob) + ' ' + val + '.';
+    } else if (r.minRamt) {
+      p2 = 'Forsendelsen er så lille, at den beregnede fragt falder under minimumssatsen. Der afregnes derfor efter minimumssatsen på ' +
+        fmt(num(s.minFragt)) + ' ' + val + '.';
+    } else {
+      p2 = 'Med en fragtpligtig vægt på ' + fmtKg(r.fragtpligtig) + ' kg falder forsendelsen i vægtklasse Q' + fmt(r.valgt.fra, 0) +
+        ' til ' + fmt(r.valgt.sats, 2) + ' ' + val + '/kg, hvilket giver ' + fmt(r.valgt.belob) + ' ' + val +
+        '. Ingen af de højere vægtklasser giver en lavere pris, så der afregnes efter den faktiske fragtpligtige vægt.';
+    }
+    af.push(p2);
+  } else if (s.fragtType === 'wm') {
+    af.push('Ved denne transportform svarer 1 m³ til ' + fmt(num(s.faktor) / 1000, 2) + ' ton, og der afregnes efter måletonnen. ' +
+      'Med ' + fmt(r.maaleton, 3) + ' w/m til ' + fmt(num(s.wmSats), 2) + ' ' + val + ' udgør grundfragten ' +
+      fmt(num(s.wmSats) * r.maaleton) + ' ' + val + ' pr. forsendelse.');
+  } else if (s.fragtType === 'fast') {
+    af.push('Grundfragten er en fast pris på ' + fmt(num(s.fastFragt)) + ' ' + val + ', uafhængigt af vægt og rumfang.');
   }
 
-  const tillaegAndel = r.total > 0 ? r.tillaegDKK / r.total * 100 : 0;
-  if (tillaegAndel > 30) {
-    k.push({ type: 'info', txt: 'Tillæg og gebyrer udgør ' + fmt(tillaegAndel, 0) + ' % af regningen. Selve fragtraten er altså kun ' +
-      fmt(100 - tillaegAndel, 0) + ' % af det, du betaler.' });
+  // 3. tillaeg og omregning
+  if (r.poster.length) {
+    const navne = r.poster.slice(0, 4).map(x => x.navn + ' på ' + fmt(x.belob) + ' ' + x.valuta);
+    let p3 = 'Hertil kommer ' + navne.slice(0, -1).join(', ') + (navne.length > 1 ? ' og ' : '') + navne[navne.length - 1] +
+      (r.poster.length > 4 ? ' samt yderligere ' + (r.poster.length - 4) + ' poster' : '') + '. ';
+    const andel = r.total > 0 ? r.tillaegDKK / r.total * 100 : 0;
+    p3 += 'Tillæg og gebyrer udgør tilsammen ' + fmt(r.tillaegDKK) + ' DKK, svarende til ' + fmt(andel, 0) +
+      ' % af den samlede pris. ';
+    if (val !== 'DKK') p3 += 'Beløbene i ' + val + ' er omregnet til danske kroner med kursen ' + fmt(kurs) + '.';
+    af.push(p3);
   }
 
+  // 4. hvad tallene betyder
+  if (r.faktiskVaegt > 0) {
+    let p4 = 'Prisen svarer til ' + fmt(r.total / (r.faktiskVaegt * r.antal)) + ' DKK pr. kg faktisk gods' +
+      (r.volumen > 0 ? ' og ' + fmt(r.total / (r.volumen * r.antal)) + ' DKK pr. m³' : '') + '. ';
+    if (r.volumenVaegt > r.faktiskVaegt) {
+      p4 += 'Transporten er dermed forholdsvis dyr i forhold til godsets faktiske vægt, fordi det fylder meget. ' +
+        'En reduktion af emballagens rumfang eller en bedre udnyttelse af kasserne vil derfor betyde mere for ' +
+        'transportomkostningen end en tilsvarende reduktion i den faktiske vægt.';
+    } else {
+      p4 += 'Da vægten styrer prisen, vil bedre pakning ikke sænke fragten nævneværdigt. Her ligger besparelsen i ' +
+        'selve raten, i større forsendelser eller i en anden transportform.';
+    }
+    af.push(p4);
+  }
+
+  // 5. varens vaerdi
   if (r.vareVaerdi > 0) {
-    k.push({ type: 'info', txt: 'Fragten svarer til ' + fmt(r.total / r.vareVaerdi * 100, 1) + ' % af varens værdi' +
-      (vaerdiPrKg > 0 ? ', og værdien er ' + fmt(vaerdiPrKg) + ' DKK pr. kg' : '') + '.' +
-      (s.mode === 'luft' && vaerdiPrKg > 0 && vaerdiPrKg < 100 ? ' Det er lavt for luftfragt, så hastigheden skal have en selvstændig værdi, før det kan forsvares.' : '') });
+    const vpk = r.faktiskVaegt > 0 ? num(s.vareVaerdi) / r.faktiskVaegt : 0;
+    let p5 = 'Med en vareværdi på ' + fmt(r.vareVaerdi) + ' DKK udgør fragten ' + fmt(r.total / r.vareVaerdi * 100, 1) +
+      ' % af varens værdi' + (vpk > 0 ? ', og værdien er ' + fmt(vpk) + ' DKK pr. kg' : '') + '. ';
+    if (s.mode === 'luft' && vpk > 0 && vpk < 100) {
+      p5 += 'Det er lavt for luftfragt, hvor tommelfingerreglen er, at godset skal have en høj værdi pr. kg. ' +
+        'Valget må derfor begrundes i hastigheden selv, fx en prøveforsendelse eller en hasteordre, og ikke i økonomien alene.';
+    } else if (s.mode === 'luft') {
+      p5 += 'Værdien pr. kg er høj nok til, at luftfragt kan forsvares økonomisk, når kapitalbinding og lager regnes med.';
+    }
+    af.push(p5);
+  }
+  return af;
+}
+
+function prosaFlere(arr, billigst, rest, dyrest, kort) {
+  const af = [];
+  // Bind listen sammen med 'og' til sidst. Der maa ikke roeres ved kommaerne i tallene.
+  const dele = arr.map(x => kort(x.navn) + ' koster ' + fmt(x.total) + ' DKK');
+  const liste = dele.length > 1 ? dele.slice(0, -1).join(', ') + ' og ' + dele[dele.length - 1] : dele[0];
+  af.push('Casen stiller ' + arr.length + ' transportmuligheder op mod hinanden. ' + liste + '.');
+
+  af.push(kort(billigst.navn) + ' er dermed den billigste. Den er ' + fmt(rest[0].total - billigst.total) + ' DKK billigere end ' +
+    kort(rest[0].navn) + (rest.length > 1 ? ' og ' + fmt(dyrest.total - billigst.total) + ' DKK billigere end ' + kort(dyrest.navn) : '') + '.');
+
+  // hvad driver prisen i den anbefalede
+  const gemt = state;
+  state = JSON.parse(JSON.stringify(billigst.state));
+  const rb = beregn();
+  let p3 = '';
+  if (rb.volumenVaegt > rb.faktiskVaegt && rb.faktiskVaegt > 0) {
+    p3 = 'I den billigste løsning styres prisen af rumfanget, ikke af vægten. Der betales for ' +
+      fmtKg(rb.volumenVaegt - rb.faktiskVaegt) + ' kg luft, og bedre pakning vil derfor betyde mere end en forhandling om raten. ';
+  }
+  const andel = rb.total > 0 ? rb.tillaegDKK / rb.total * 100 : 0;
+  if (andel > 30) p3 += 'Tillæg og gebyrer udgør ' + fmt(andel, 0) + ' % af regningen, så selve fragtraten er kun ' +
+    fmt(100 - andel, 0) + ' % af det, der betales. Tilbud bør derfor sammenlignes på totalprisen. ';
+  if (rb.faktiskVaegt > 0) p3 += 'Prisen svarer til ' + fmt(rb.total / (rb.faktiskVaegt * rb.antal)) + ' DKK pr. kg gods.';
+  state = gemt;
+  if (p3.trim()) af.push(p3.trim());
+
+  // kapacitet
+  const gods = Math.max.apply(null, [0].concat(arr.filter(x => !x.erKapacitet && num(x.volumen) > 0).map(x => num(x.volumen))));
+  const kap = arr.filter(x => x.erKapacitet && num(x.volumen) > 0);
+  if (gods > 0 && kap.length) {
+    const stram = kap.filter(x => gods / num(x.volumen) > 0.85);
+    const tom = kap.filter(x => gods / num(x.volumen) < 0.6);
+    let p = '';
+    if (stram.length) p += 'Casen sender omkring ' + fmt(gods, 0) + ' m³, og ' + kort(stram[0].navn) + ' har ' +
+      fmt(num(stram[0].volumen), 0) + ' m³ kapacitet. Det er ' + fmt(gods / num(stram[0].volumen) * 100, 0) +
+      ' % udnyttelse, altså helt op til kanten, og det bør kontrolleres, om godset overhovedet kan være i containeren. ';
+    if (tom.length) p += kort(tom[0].navn) + ' har til gengæld ' + fmt(num(tom[0].volumen), 0) + ' m³ kapacitet og udnyttes kun ' +
+      fmt(gods / num(tom[0].volumen) * 100, 0) + ' %, hvilket betyder, at der betales for tom plads.';
+    if (p.trim()) af.push(p.trim());
+  }
+
+  // det der ikke er pris
+  const citatB = casecitat(billigst.prosa);
+  const forbehold = /no guarantee|ingen garanti|prolonged|forl(?:æ|ae)nget|delay|forsink|vary|varier/i.test(citatB);
+  let p5 = 'Valget bør ikke træffes på pris alene. ';
+  const medTid = arr.filter(x => num(x.tid) > 0);
+  if (medTid.length > 1) {
+    const h = medTid.reduce((a, b) => num(b.tid) < num(a.tid) ? b : a);
+    const l = medTid.reduce((a, b) => num(b.tid) > num(a.tid) ? b : a);
+    p5 += num(h.tid) === num(l.tid)
+      ? 'Transporttiden er den samme for mulighederne, så den kan ikke bruges til at skille dem ad. '
+      : kort(h.navn) + ' er hurtigst med ' + fmt(num(h.tid), 0) + ' dage mod ' + fmt(num(l.tid), 0) + ' dage for den langsomste, og binder derfor mindst kapital undervejs. ';
+  }
+  p5 += 'Samlegods håndteres flere gange undervejs, mens en hel container plomberes ét sted og åbnes ét sted, ' +
+    'hvilket mindsker risikoen for skade og svind. Dertil kommer, at transportørens ansvar er beløbsbegrænset, ' +
+    'så en forsikring bør indgå i vurderingen.';
+  af.push(p5);
+
+  let p6 = 'Samlet set anbefales ' + kort(billigst.navn) + ' til ' + fmt(billigst.total) + ' DKK. ';
+  if (forbehold && citatB) {
+    p6 += 'Casen tager dog forbehold for netop denne løsning: «' + citatB + '» Kan den usikkerhed ikke accepteres, ' +
+      'koster den næstbilligste ' + fmt(rest[0].total - billigst.total) + ' DKK mere for større sikkerhed.';
   } else {
-    k.push({ type: 'advarsel', txt: 'Vareværdien er ikke udfyldt, så fragtraten, forsikringen og kapitalbindingen kan ikke beregnes. Udfyld den under punkt A, hvis casen oplyser den.' });
+    p6 += 'Der er ikke i casen noget, der taler afgørende imod den, og de øvrige muligheder koster mere uden at give bedre service.';
   }
+  af.push(p6);
+  return af;
+}
 
-  if (!(s.linjer || []).some(l => l.aktiv && /forsikring|insurance/i.test(l.navn))) {
-    k.push({ type: 'advarsel', txt: 'Der er ingen forsikringspost. Præmien beregnes normalt af varens værdi plus fragten, og transportørens eget ansvar er beløbsbegrænset. Tag stilling til den, også hvis du vælger den fra.' });
-  }
+// De ting brugeren selv skal tage stilling til. De hoerer ikke i selve teksten.
+function konklusionNoter(r) {
+  const s = state, n = [];
+  if (!(r.vareVaerdi > 0)) n.push('Vareværdien er ikke udfyldt, så fragtraten, forsikringen og kapitalbindingen kan ikke beregnes. Udfyld den under punkt A, hvis casen oplyser den.');
+  if (!(s.linjer || []).some(l => l.aktiv && /forsikring|insurance/i.test(l.navn))) n.push('Der er ingen forsikringspost i beregningen. Tag stilling til den, også hvis du vælger den fra.');
+  if (!(num(s.transportTid) > 0)) n.push('Transporttiden er ikke udfyldt, så kapitalbindingen under transporten indgår ikke.');
+  n.push('Husk leveringsbetingelsen. Incoterms afgør, hvem der betaler og bærer risikoen på hver strækning, og dermed hvilke poster der overhovedet er dine.');
+  return n;
+}
 
-  k.push({ type: 'info', txt: 'Der er kun regnet på én løsning. En konklusion står stærkere, hvis den holdes op mod et alternativ. Lav en beregning mere, fx en anden transportform eller et andet tilbud, tryk Gem som mulighed på begge, så skrives sammenligningen her.' });
-
-  const farve = { ok: 'border-emerald-800 bg-emerald-950/20', advarsel: 'border-amber-800 bg-amber-950/20', info: 'border-[#1e2836]' };
-  let h = k.map(x => '<div class="border rounded-xl p-3 text-sm text-slate-300 ' + farve[x.type] + '">' + esc(x.txt) + '</div>').join('');
-
-  const citat = casecitat(samletTekst);
-  if (citat) {
-    h += '<div class="border border-[#1e2836] rounded-xl p-3 mt-2">' +
-      '<div class="text-xs text-slate-400 mb-1">Fra casens egen tekst:</div>' +
-      '<div class="text-sm text-slate-300 italic">&laquo;' + esc(citat) + '&raquo;</div></div>';
+function visKonklusion(afsnit, noter, ekstra) {
+  const tekst = afsnit.join(String.fromCharCode(10) + String.fromCharCode(10));
+  let h = '<div class="border border-[#1e2836] rounded-xl p-4">' +
+    '<div class="flex items-center gap-3 mb-3"><span class="font-semibold text-sm">Konklusion</span>' +
+    '<button id="kopierKonklusion" class="ml-auto text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg font-medium">Kopiér konklusion</button></div>' +
+    '<div id="konklusionTekst" class="space-y-3 text-sm text-slate-200 leading-relaxed" data-tekst="' + esc(tekst) + '">' +
+    afsnit.map(x => '<p>' + esc(x) + '</p>').join('') + '</div></div>';
+  if (ekstra) h += ekstra;
+  if (noter && noter.length) {
+    h += '<div class="border border-amber-800 bg-amber-950/20 rounded-xl p-3 mt-3">' +
+      '<div class="text-sm font-medium text-amber-200 mb-2">Det skal du selv tage stilling til</div>' +
+      '<ul class="text-sm text-slate-300 list-disc pl-5 space-y-1">' +
+      noter.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>';
   }
   return h;
 }
@@ -1307,120 +1451,46 @@ function enkeltKonklusion(r, navn) {
 function tegnKonklusion(arr) {
   const boks = $('#konklusion');
   if (!boks) return;
+  const kort = navn => String(navn).length > 46 ? String(navn).slice(0, 44).trim() + '…' : String(navn);
+
   if (arr.length < 2) {
     const enkelt = arr.length === 1 ? arr[0] : null;
     const gemtState = state;
     if (enkelt) state = JSON.parse(JSON.stringify(enkelt.state));
     const r = beregn();
     const navn = enkelt ? enkelt.navn : (state.caseNavn || 'Beregningen');
-    const harIndhold = r.total > 0 || r.fragtpligtig > 0;
-    const h = harIndhold ? enkeltKonklusion(r, navn) : '';
+    if (!(r.total > 0 || r.fragtpligtig > 0)) { state = gemtState; boks.innerHTML = ingenBeregningEndnu(); return; }
+    const afsnit = prosaEnkelt(r, navn);
+    const noter = konklusionNoter(r);
+    noter.push('Der er kun regnet på én løsning. En konklusion står stærkere, hvis den holdes op mod et alternativ. Lav en beregning mere og tryk Gem som mulighed på begge, så skrives sammenligningen her.');
+    const citat = casecitat(samletTekst);
+    const ekstra = citat ? '<div class="border border-[#1e2836] rounded-xl p-3 mt-3"><div class="text-xs text-slate-400 mb-1">Fra casens egen tekst:</div>' +
+      '<div class="text-sm text-slate-300 italic">&laquo;' + esc(citat) + '&raquo;</div></div>' : '';
     state = gemtState;
-    boks.innerHTML = h || ingenBeregningEndnu();
+    boks.innerHTML = visKonklusion(afsnit, noter, ekstra);
     return;
   }
-  const kort = navn => String(navn).length > 46 ? String(navn).slice(0, 44).trim() + '…' : String(navn);
+
   const billigst = arr.reduce((a, b) => b.total < a.total ? b : a);
   const dyrest = arr.reduce((a, b) => b.total > a.total ? b : a);
   const rest = arr.filter(x => x !== billigst).sort((a, b) => a.total - b.total);
+  const afsnit = prosaFlere(arr, billigst, rest, dyrest, kort);
 
-  const saetninger = [];
-  saetninger.push({ type: 'ok', txt: kort(billigst.navn) + ' er den billigste med ' + fmt(billigst.total) + ' DKK, hvilket er ' +
-    fmt(rest[0].total - billigst.total) + ' DKK under ' + kort(rest[0].navn) + ' og ' +
-    fmt(dyrest.total - billigst.total) + ' DKK under den dyreste.' });
-
-  const medVol = arr.filter(x => num(x.volumen) > 0);
-  if (medVol.length === arr.length) {
-    const prM3 = medVol.map(x => ({ navn: x.navn, v: x.total / num(x.volumen) })).sort((a, b) => a.v - b.v);
-    saetninger.push({ type: 'info', txt: 'Regnet pr. m³ er ' + kort(prM3[0].navn) + ' billigst med ' + fmt(prM3[0].v) +
-      ' DKK pr. m³, mod ' + fmt(prM3[prM3.length - 1].v) + ' DKK pr. m³ for den dyreste. Bruger du ikke hele kapaciteten, betaler du for tom plads.' });
-  }
-
-  const medTid = arr.filter(x => num(x.tid) > 0);
-  if (medTid.length > 1) {
-    const hurtigst = medTid.reduce((a, b) => num(b.tid) < num(a.tid) ? b : a);
-    const langsomst = medTid.reduce((a, b) => num(b.tid) > num(a.tid) ? b : a);
-    if (num(hurtigst.tid) !== num(langsomst.tid)) {
-      saetninger.push({ type: 'info', txt: kort(hurtigst.navn) + ' er hurtigst med ' + fmt(num(hurtigst.tid), 0) +
-        ' dage mod ' + fmt(num(langsomst.tid), 0) + ' dage, og binder derfor mindst kapital undervejs.' });
-    } else {
-      saetninger.push({ type: 'info', txt: 'Transporttiden er den samme for mulighederne, så tiden kan ikke bruges til at skille dem ad. Se i stedet på pris, sikkerhed for levering og hvor meget godset håndteres undervejs.' });
-    }
-  }
-
-  // forsikring
-  const medForsikring = arr.filter(x => (x.state.linjer || []).some(l => l.aktiv && /forsikring|insurance/i.test(l.navn)));
-  if (medForsikring.length === 0) {
-    saetninger.push({ type: 'advarsel', txt: 'Ingen af mulighederne har en forsikringspost. Præmien beregnes normalt af varens værdi plus fragten, så den dyreste transport også giver den højeste præmie. Tag den med, før du vælger.' });
-  } else if (medForsikring.length < arr.length) {
-    saetninger.push({ type: 'advarsel', txt: 'Kun ' + medForsikring.length + ' af ' + arr.length + ' muligheder har forsikring med. Så længe det ikke er ens, kan priserne ikke sammenlignes direkte.' });
-  } else {
-    saetninger.push({ type: 'info', txt: 'Alle muligheder har forsikring med. Da præmien følger varens værdi plus fragten, vokser den i takt med fragtprisen, og den billigste transport er derfor også den billigst forsikrede.' });
-  }
-
-  // Udnyttelse: en container koeber du plads i, ikke gods. Passer godset overhovedet?
-  const faktiskeMaengder = arr.filter(x => !x.erKapacitet && num(x.volumen) > 0).map(x => num(x.volumen));
-  const gods = faktiskeMaengder.length ? Math.max.apply(null, faktiskeMaengder) : 0;
-  const kapaciteter = arr.filter(x => x.erKapacitet && num(x.volumen) > 0);
-  if (gods > 0 && kapaciteter.length) {
-    kapaciteter.forEach(x => {
-      const u = gods / num(x.volumen);
-      if (u > 0.85) {
-        saetninger.push({ type: 'advarsel', txt: kort(x.navn) + ' har ' + fmt(num(x.volumen), 0) + ' m³ kapacitet, og casen sender ca. ' +
-          fmt(gods, 0) + ' m³. Det er ' + fmt(u * 100, 0) + ' % udnyttelse, altså helt op til kanten. Uregelmæssigt gods som møbler stables sjældent tættere end 75 til 85 procent, så tjek om det overhovedet kan være i containeren, før du vælger den.' });
-      } else if (u < 0.6) {
-        saetninger.push({ type: 'info', txt: kort(x.navn) + ' har ' + fmt(num(x.volumen), 0) + ' m³ kapacitet, men der sendes kun ca. ' +
-          fmt(gods, 0) + ' m³, altså ' + fmt(u * 100, 0) + ' % udnyttelse. Du betaler for tom plads. Det giver kun mening, hvis mængden forventes at vokse.' });
-      }
-    });
-  }
-
-  const citatBilligst = casecitat(billigst.prosa);
-  const forbehold = /no guarantee|ingen garanti|prolonged|forl(?:æ|ae)nget|delay|forsink|vary|varier/i.test(citatBilligst);
-  saetninger.push({ type: 'ok', txt: 'Anbefaling: vælg ' + kort(billigst.navn) + ', som er billigst med ' + fmt(billigst.total) + ' DKK. ' +
-    (forbehold
-      ? 'Casen tager dog forbehold for netop denne løsning, så du skal kunne leve med den usikkerhed. Kan du ikke det, koster den næstbilligste ' + fmt(rest[0].total - billigst.total) + ' DKK mere om måneden for større sikkerhed.'
-      : 'Der er ikke noget i casen, der taler afgørende imod den, og de øvrige muligheder koster mere uden at give noget bedre igen.') });
-  saetninger.push({ type: 'info', txt: 'Husk håndteringen: samlegods læsses sammen med andre kunders varer og omlades flere gange, mens en hel container plomberes ét sted og åbnes ét sted. Flere omladninger giver større risiko for skade og svind, og transportørens ansvar er beløbsbegrænset.' });
-
-  const farve = { ok: 'border-emerald-800 bg-emerald-950/20', advarsel: 'border-amber-800 bg-amber-950/20', info: 'border-[#1e2836]' };
-  let h = saetninger.map(x => '<div class="border rounded-xl p-3 text-sm text-slate-300 ' + farve[x.type] + '">' + esc(x.txt) + '</div>').join('');
-
-  // Naerbillede af den anbefalede loesning
   const gemtState = state;
   state = JSON.parse(JSON.stringify(billigst.state));
   const rb = beregn();
-  const naer = [];
-  if (rb.volumenVaegt > rb.faktiskVaegt && rb.faktiskVaegt > 0) {
-    naer.push('Prisen styres af rumfanget, ikke af vægten. Der betales for ' + fmt(rb.volumenVaegt - rb.faktiskVaegt) +
-      ' kg luft, så bedre pakning flytter mere end en forhandling om raten.');
-  } else if (rb.faktiskVaegt > 0 && rb.volumen > 0) {
-    naer.push('Prisen styres af vægten. Godset er tungt i forhold til sin plads, så bedre pakning sænker ikke fragten nævneværdigt.');
-  }
-  if (state.fragtType === 'trappe' && rb.valgt && !rb.valgt.egen) {
-    const egen = rb.kandidater.find(x => x.egen);
-    naer.push('Der er udnyttet et break-point: der deklareres ' + fmt(rb.valgt.vaegt) + ' kg i stedet for ' + fmt(rb.fragtpligtig) +
-      ' kg' + (egen ? ', hvilket sparer ' + fmt(egen.belob - rb.valgt.belob) + ' ' + state.valutaFragt : '') + '. Husk at begrunde det.');
-  }
-  const andel = rb.total > 0 ? rb.tillaegDKK / rb.total * 100 : 0;
-  if (andel > 30) naer.push('Tillæg og gebyrer udgør ' + fmt(andel, 0) + ' % af regningen, så selve fragtraten er kun ' + fmt(100 - andel, 0) + ' % af det, der betales.');
-  if (rb.faktiskVaegt > 0) naer.push('Prisen svarer til ' + fmt(rb.total / (rb.faktiskVaegt * rb.antal)) + ' DKK pr. kg gods.');
+  const noter = konklusionNoter(rb);
   state = gemtState;
-  if (naer.length) {
-    h += '<div class="border border-[#1e2836] rounded-xl p-3 mt-2">' +
-      '<div class="text-xs text-slate-400 mb-2">Om den anbefalede løsning, ' + esc(kort(billigst.navn)) + ':</div>' +
-      '<ul class="text-sm text-slate-300 list-disc pl-5 space-y-1">' +
-      naer.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>';
-  }
 
   const medCitat = arr.filter(x => casecitat(x.prosa));
+  let ekstra = '';
   if (medCitat.length) {
-    h += '<div class="border border-[#1e2836] rounded-xl p-3 mt-2">' +
+    ekstra = '<div class="border border-[#1e2836] rounded-xl p-3 mt-3">' +
       '<div class="text-xs text-slate-400 mb-2">Sådan beskriver casen selv mulighederne:</div>' +
       medCitat.map(x => '<div class="mb-2"><div class="text-[11px] text-blue-300">' + esc(kort(x.navn)) + ' &mdash; ' + fmt(x.total) + ' DKK</div>' +
         '<div class="text-sm text-slate-300 italic">&laquo;' + esc(casecitat(x.prosa)) + '&raquo;</div></div>').join('') + '</div>';
   }
-  boks.innerHTML = h;
+  boks.innerHTML = visKonklusion(afsnit, noter, ekstra);
 }
 
 // ============================================================
@@ -2635,6 +2705,16 @@ function bind() {
   drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) haandterFiler(Array.from(e.dataTransfer.files)); });
 
   $('#gemCase').addEventListener('click', gemDenneCase);
+  document.addEventListener('click', e => {
+    if (!e.target.closest || !e.target.closest('#kopierKonklusion')) return;
+    const t = $('#konklusionTekst');
+    if (!t) return;
+    const txt = t.dataset.tekst || '';
+    const b2 = $('#kopierKonklusion'), gl = b2.textContent;
+    const ok = () => { b2.textContent = 'Kopieret ✔'; setTimeout(() => { b2.textContent = gl; }, 1400); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, () => fallbackKopi(txt, ok));
+    else fallbackKopi(txt, ok);
+  });
   $('#gemteListe').addEventListener('click', e => {
     const a = e.target.closest('.aabnCase'), d = e.target.closest('.sletCase');
     if (a) { aabnGemtCase(+a.dataset.i); return; }
