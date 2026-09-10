@@ -31,7 +31,7 @@
       <div class="text-[11px] text-slate-500">Fragtpligtig vægt, transportpris og totalomkostning &mdash; luft, sø, bane og vej</div>
     </div>
     <div class="ml-auto flex items-center gap-2">
-      <select id="presetVaelger" class="text-sm"></select>
+      <select id="presetVaelger" class="text-sm" autocomplete="off"></select>
       <button id="indlaesPreset" class="text-sm bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg font-medium">Indlæs</button>
     </div>
   </div>
@@ -2016,6 +2016,7 @@ const FUND_IKON = { kolli: '📦', vaegt: '⚖️', tiers: '📊', minFragt: '�
 
 // Hvordan skal casen laeses? Genkendelsen kan tage fejl paa en ukendt case,
 // saa valget ligger hos brugeren.
+let valgtPreset = 'tom';   // hvilken eksempelcase brugeren sidst har valgt
 let opdelingTilstand = 'auto';   // 'auto' = én beregning pr. mulighed, 'samlet' = alt i én
 
 function tegnOpdeling() {
@@ -2301,7 +2302,7 @@ function bind() {
   }));
 
   $('#presetVaelger').innerHTML = Object.keys(PRESETS).map(k => '<option value="' + k + '">' + esc(PRESETS[k].navn) + '</option>').join('');
-  $('#indlaesPreset').addEventListener('click', () => { state = PRESETS[$('#presetVaelger').value].lav(); fyldFormular(); });
+  $('#indlaesPreset').addEventListener('click', () => { valgtPreset = $('#presetVaelger').value; state = PRESETS[valgtPreset].lav(); fyldFormular(); });
 
   $('#mode').innerHTML = Object.keys(MODES).map(k => '<option value="' + k + '">' + MODES[k].navn + '</option>').join('');
   $('#mode').addEventListener('change', e => {
@@ -2512,6 +2513,13 @@ function fallbackKopi(txt, ok) {
 
 bind();
 tegnFund();
+// Browseren kan genskabe gamle feltvaerdier efter en genindlaesning.
+// Naar siden vises, skrives alt derfor tilbage fra beregningen selv.
+window.addEventListener('pageshow', () => {
+  $('#presetVaelger').value = valgtPreset;
+  fyldFormular();
+});
+
 // Start med en tom beregning. Eksempelcasene ligger i menuen oeverst.
 state = tomState();
 $('#presetVaelger').value = 'tom';
