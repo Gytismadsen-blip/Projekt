@@ -87,6 +87,36 @@
     <button id="scanTekst" class="mt-2 text-sm bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg font-medium">Find værdier</button>
   </div>
 
+  <div class="card p-4" id="aiKort">
+    <h2 class="font-semibold mb-1">AI-hjælp til lang eller kompleks case</h2>
+    <p class="text-xs text-slate-400 mb-3" id="aiIntro">
+      Har casen flere delspørgsmål eller transportmuligheder, kan siden lave en prompt, du selv kopierer til din egen AI, fx ChatGPT, Claude eller Gemini.
+      AI'en opdeler casen og beskriver hver transport for sig. Det <span class="text-slate-300">mindsker risikoen</span> for, at priser, vægte, kurser og tillæg fra forskellige dele blandes sammen.
+      Der er <span class="text-amber-300">ingen AI i FragtAnalyse</span> og ingen API-nøgle. Prompten laves lokalt, og intet sendes automatisk. Du kontrollerer hver værdi, før den overføres.
+    </p>
+    <div class="flex flex-wrap gap-2">
+      <button id="aiGenerer" class="text-sm bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg font-medium">Generér prompt fra case</button>
+      <span class="text-xs text-slate-500 self-center">Vælg først et delspørgsmål ovenfor, hvis casen har flere.</span>
+    </div>
+
+    <div id="aiPromptBoks" class="hidden mt-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-sm font-medium">Prompt</span>
+        <button id="aiKopierPrompt" class="ml-auto text-xs bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg">Kopiér prompt</button>
+      </div>
+      <textarea id="aiPrompt" rows="8" class="w-full text-[11px] font-mono" readonly></textarea>
+      <div class="text-[11px] text-slate-500 mt-1">Kopiér prompten til din egen AI. Hvis du bruger en ekstern tjeneste, behandles caseteksten efter den tjenestes regler.</div>
+
+      <div class="mt-4">
+        <span class="text-sm font-medium">Indsæt AI-svaret her</span>
+        <textarea id="aiSvar" rows="6" class="w-full text-[11px] font-mono mt-1" placeholder="Indsæt hele AI-svaret (JSON) her..."></textarea>
+        <button id="aiAnalyser" class="mt-2 text-sm bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg font-medium">Analysér AI-svar</button>
+      </div>
+    </div>
+
+    <div id="aiKontrol" class="hidden mt-4"></div>
+  </div>
+
   <div class="card p-4">
     <div class="flex flex-wrap items-center gap-3 mb-1">
       <h2 class="font-semibold">Fundne værdier</h2>
@@ -3011,6 +3041,7 @@ function fundKort(f) {
 
 function tegnFund() {
   $('#fundAntal').textContent = fund.length + ' fund';
+  tegnAiAnbefaling();
   tegnDelspoergsmaal();
   tegnOpdeling();
   tegnTjekliste();
@@ -3122,6 +3153,9 @@ function byggStateFraFund(valgte, navn, grund) {
 
   const vk = valgte.find(f => f.type === 'virksomhed');
   if (vk) { s.virksomhed = vk.data.navn; s.virksomhedKandidater = vk.data.kandidater || []; }
+
+  const md = valgte.find(f => f.type === 'mode');
+  if (md && MODES[md.data.mode]) { s.mode = md.data.mode; s.faktor = MODES[md.data.mode].faktor; s.co2Faktor = MODES[md.data.mode].co2; }
 
   const inco = valgte.find(f => f.type === 'incoterm');
   if (inco) { s.incoterm = inco.data.kode; s.incotermSted = inco.data.sted; s.incotermVersion = inco.data.version; s.incotermPrisgrundlag = !!inco.data.prisgrundlag; }
@@ -3285,6 +3319,447 @@ async function haandterFiler(filer) {
 // ============================================================
 //  Events
 // ============================================================
+// ============================================================
+//  AI-hjælp til lange cases (version 1)
+//  Siden laver en prompt -> brugeren kører den i sin egen AI ->
+//  indsætter JSON-svaret -> siden validerer, tjekker citater mod
+//  casen, viser en kontrolskærm, og overfører kun godkendte værdier.
+//  Ingen AI eller API i siden. Siden regner selv.
+// ============================================================
+const AI_SCHEMA_VERSION = '1.0';
+
+function aiCaseTekst() {
+  // hele casen som baggrund, uden filnavne-markørerne
+  return String(samletTekst).replace(/=====[^\n]*=====/g, '').trim();
+}
+
+function aiValgtDelspoergsmaal() {
+  if (delspoergsmaalTekster.length && valgtDelspoergsmaal >= 0) return delspoergsmaalTekster[valgtDelspoergsmaal].titel;
+  return '';
+}
+
+function byggAiPrompt() {
+  const valgt = aiValgtDelspoergsmaal();
+  const skema = [
+    '{',
+    '  "schema_version": "' + AI_SCHEMA_VERSION + '",',
+    '  "case_name": "string",',
+    '  "selected_question": "string eller null",',
+    '  "company": { "value": "string eller null", "source_quote": "string eller null" },',
+    '  "exchange_rates": [ { "currency": "USD", "dkk_per_unit": 6.0, "source_quote": "..." } ],',
+    '  "transport_options": [',
+    '    {',
+    '      "name": "kort navn på muligheden",',
+    '      "mode": "air | sea | rail | road",',
+    '      "incoterm": { "term": "FCA eller null", "place": "string eller null", "version": "2020 | 2010 | 2000 eller null", "source_quote": "string eller null" },',
+    '      "packages": [ { "quantity": 14, "length_cm": 80, "width_cm": 40, "height_cm": 60, "weight_each_kg": null, "source_quote": "..." } ],',
+    '      "total_weight_kg": { "value": 320, "source_quote": "...", "formula": null },',
+    '      "volume_m3": { "value": null, "source_quote": null, "formula": null },',
+    '      "base_freight": { "type": "tiered | per_wm | flat | per_kg", "currency": "EUR", "tiers": [ { "from_kg": 100, "rate": 5.11 } ], "rate": null, "min_charge": null, "source_quote": "..." },',
+    '      "surcharges": [ { "name": "CAF", "type": "percent_of_base | flat | per_kg | per_wm | per_100kg | per_m3", "amount": 6, "currency": null, "source_quote": "..." } ],',
+    '      "goods_value_dkk": { "value": null, "source_quote": null, "formula": null },',
+    '      "insurance_percent": { "value": null, "base": "value | value_plus_freight", "source_quote": null },',
+    '      "transport_time_days": { "value": null, "source_quote": null },',
+    '      "derived_values": [ { "name": "gross_weight_kg", "value": 456, "formula": "300 + 3 x 52" } ],',
+    '      "missing_information": [ "hvad casen ikke oplyser" ]',
+    '    }',
+    '  ]',
+    '}'
+  ].join('\n');
+
+  return [
+    'Du skal strukturere oplysninger fra en transportcase til brug i et beregningsværktøj.',
+    '',
+    'REGLER',
+    '1. Du må ikke gætte manglende oplysninger. Brug null.',
+    '2. Hold hver transportmulighed helt adskilt. Bland aldrig priser, gebyrer eller kurser fra forskellige muligheder eller delspørgsmål.',
+    '3. Brug hele casen til at finde nødvendige fælles oplysninger, også dem der står tidligere i teksten (mål og vægt på kolli, valutakurs, virksomhed).',
+    (valgt ? '4. Fokusér KUN på delspørgsmålet "' + valgt + '". Ignorér de øvrige delspørgsmål.' : '4. Behandl alle transportmuligheder i casen.'),
+    '5. For hver vigtig værdi: medtag et ordret source_quote fra casen (kopiér teksten præcis).',
+    '6. Udledte værdier skal have en synlig formel i "formula", fx "300 + 3 x 52".',
+    '7. Du må gerne kontrollere dine egne udregninger, men FragtAnalyse udfører det endelige regnestykke. Medtag ikke en samlet pris.',
+    '8. Returnér KUN gyldig JSON i formatet nedenfor. Ingen forklarende tekst, ingen markdown.',
+    '9. Svaret skal begynde med "schema_version": "' + AI_SCHEMA_VERSION + '".',
+    '',
+    (valgt ? 'VALGT DELSPØRGSMÅL' + '\n' + valgt + '\n' : ''),
+    'CASETEKST',
+    aiCaseTekst(),
+    '',
+    'SVARFORMAT (returnér præcis denne struktur, kun JSON)',
+    skema
+  ].filter(function (x) { return x !== ''; }).join('\n');
+}
+
+// ---------- Parser: fjern markdown, men afvis rodede svar ----------
+function parseAiSvar(txt) {
+  let t = String(txt || '').trim();
+  if (!t) return { ok: false, fejl: 'Der er ikke indsat noget svar.' };
+  // fjern ```json ... ``` eller ``` ... ```
+  const fence = t.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fence) t = fence[1].trim();
+  // svaret skal være ét JSON-objekt: starter med { og slutter med }
+  if (t[0] !== '{' || t[t.length - 1] !== '}') {
+    return { ok: false, fejl: 'AI-svaret kunne ikke læses sikkert. Bed AI\'en om at returnere svaret igen som ren JSON uden anden tekst.' };
+  }
+  // ingen ekstra tegn efter det yderste objekt
+  let dybde = 0, slut = -1, iStr = false, esc = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (iStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') iStr = false; continue; }
+    if (c === '"') iStr = true;
+    else if (c === '{') dybde++;
+    else if (c === '}') { dybde--; if (dybde === 0) { slut = i; break; } }
+  }
+  if (slut !== t.length - 1) {
+    return { ok: false, fejl: 'AI-svaret indeholder mere end ét JSON-objekt eller ekstra tekst. Bed AI\'en om kun at returnere ét JSON-objekt.' };
+  }
+  let data;
+  try { data = JSON.parse(t); }
+  catch (e) { return { ok: false, fejl: 'JSON-svaret kunne ikke læses: ' + e.message + '. Bed AI\'en om at rette formatet.' }; }
+  if (!data || typeof data !== 'object') return { ok: false, fejl: 'Svaret er ikke et JSON-objekt.' };
+  if (String(data.schema_version || '') !== AI_SCHEMA_VERSION) {
+    return { ok: false, fejl: 'Svaret mangler "schema_version": "' + AI_SCHEMA_VERSION + '". Generér prompten igen og kør den forfra.' };
+  }
+  if (!Array.isArray(data.transport_options) || !data.transport_options.length) {
+    return { ok: false, fejl: 'Svaret indeholder ingen transport_options.' };
+  }
+  return { ok: true, data: data };
+}
+
+// ---------- Citat-tjek: findes AI'ens citat i casen? ----------
+function aiNorm(x) { return String(x || '').toLowerCase().replace(/\s+/g, ' ').replace(/[^\wæøåäöüéèà0-9., %/-]/g, '').trim(); }
+function aiCitatFindes(citat, normCase) {
+  const c = aiNorm(citat);
+  if (c.length < 6) return false;
+  return normCase.indexOf(c) >= 0;
+}
+
+// ---------- Validering + farvelægning ----------
+// status: 'groen' | 'blaa' | 'gul' | 'roed' | 'graa'
+function validerAiSvar(data) {
+  const normCase = aiNorm(aiCaseTekst());
+  const raekker = [];
+  const MODE_MAP = { air: 'luft', luft: 'luft', sea: 'soe', ocean: 'soe', 'søfragt': 'soe', soe: 'soe', rail: 'bane', bane: 'bane', road: 'vejEU', vej: 'vejEU', truck: 'vejEU' };
+  const VALID_CUR = ['USD', 'EUR', 'DKK', 'GBP', 'SEK', 'NOK', 'CHF', 'PLN', 'CNY', 'JPY', 'CAD', 'AUD'];
+
+  function felt(gruppe, navn, vaerdi, o) {
+    o = o || {};
+    let status = 'gul';
+    if (vaerdi === null || vaerdi === undefined || vaerdi === '') status = 'graa';
+    else if (o.roed) status = 'roed';
+    else if (o.formel) status = 'blaa';
+    else if (o.citat && aiCitatFindes(o.citat, normCase)) status = 'groen';
+    else if (o.citat) status = 'gul';       // citat opgivet men ikke fundet i casen
+    raekker.push({ gruppe: gruppe, navn: navn, vaerdi: vaerdi, status: status,
+      citat: o.citat || '', formel: o.formel || '', note: o.note || '',
+      import: o.import || null, valgt: status === 'groen' });
+  }
+
+  // fælles: virksomhed, kurser
+  if (data.company) felt('Fælles', 'Virksomhed', data.company.value, { citat: data.company.source_quote, import: { type: 'virksomhed', navn: data.company.value } });
+  (data.exchange_rates || []).forEach(function (k) {
+    const kode = String(k.currency || '').toUpperCase();
+    const kurs = Number(k.dkk_per_unit);
+    felt('Fælles', 'Valutakurs 1 ' + kode, isFinite(kurs) && kurs > 0 ? kurs + ' DKK' : null,
+      { citat: k.source_quote, roed: kode && VALID_CUR.indexOf(kode) < 0 || (kode && !(kurs > 0)),
+        import: { type: 'kurs', valuta: kode, kurs: kurs } });
+  });
+
+  data.transport_options.forEach(function (opt, oi) {
+    const g = data.transport_options.length > 1 ? (opt.name || ('Mulighed ' + (oi + 1))) : (opt.name || 'Transporten');
+    const modeKode = MODE_MAP[String(opt.mode || '').toLowerCase()] || '';
+    felt(g, 'Transportform', opt.mode || null, { roed: !modeKode, import: { type: 'mode', mode: modeKode }, afsnit: oi });
+
+    // Incoterms
+    if (opt.incoterm && opt.incoterm.term) {
+      const term = String(opt.incoterm.term).toUpperCase();
+      const ver = opt.incoterm.version ? String(opt.incoterm.version) : '';
+      const vf = (typeof incotermVersionsFejl === 'function') ? incotermVersionsFejl(term, ver) : '';
+      felt(g, 'Leveringsbetingelse', term + (opt.incoterm.place ? ' ' + opt.incoterm.place : '') + (ver ? ', Incoterms ' + ver : ''),
+        { citat: opt.incoterm.source_quote, roed: !!vf, note: vf,
+          import: { type: 'incoterm', kode: term, sted: opt.incoterm.place || '', version: ver }, afsnit: oi });
+    }
+
+    // kolli
+    (opt.packages || []).forEach(function (pk, pi) {
+      const q = Number(pk.quantity), L = Number(pk.length_cm), B = Number(pk.width_cm), H = Number(pk.height_cm);
+      const ok = q > 0 && L > 0 && B > 0 && H > 0;
+      felt(g, 'Kolli ' + (pi + 1), ok ? q + ' stk. ' + L + '×' + B + '×' + H + ' cm' : null,
+        { citat: pk.source_quote, roed: !ok && (pk.quantity != null || pk.length_cm != null),
+          import: { type: 'kolli', antal: q, l: L, b: B, h: H, vaegt: Number(pk.weight_each_kg) || 0 }, afsnit: oi });
+    });
+
+    // vægt og rumfang
+    if (opt.total_weight_kg) {
+      const v = Number(opt.total_weight_kg.value);
+      felt(g, 'Samlet vægt', isFinite(v) && v > 0 ? v + ' kg' : (opt.total_weight_kg.value == null ? null : opt.total_weight_kg.value),
+        { citat: opt.total_weight_kg.source_quote, formel: opt.total_weight_kg.formula, roed: opt.total_weight_kg.value != null && !(v >= 0),
+          import: { type: 'vaegt', vaegt: v }, afsnit: oi });
+    }
+    if (opt.volume_m3) {
+      const v = Number(opt.volume_m3.value);
+      felt(g, 'Rumfang', isFinite(v) && v > 0 ? v + ' m³' : (opt.volume_m3.value == null ? null : opt.volume_m3.value),
+        { citat: opt.volume_m3.source_quote, formel: opt.volume_m3.formula, roed: opt.volume_m3.value != null && !(v >= 0),
+          import: { type: 'volumen', volumen: v }, afsnit: oi });
+    }
+
+    // grundfragt
+    const bf = opt.base_freight || {};
+    const bfCur = String(bf.currency || '').toUpperCase();
+    if (bf.type === 'tiered' && Array.isArray(bf.tiers) && bf.tiers.length) {
+      const tiers = bf.tiers.map(function (x) { return { fra: Number(x.from_kg) || 0, sats: Number(x.rate) }; }).filter(function (x) { return x.sats > 0; });
+      felt(g, 'Grundfragt (trappesats)', tiers.length ? tiers.map(function (x) { return x.fra + ': ' + x.sats; }).join(' · ') + ' ' + bfCur : null,
+        { citat: bf.source_quote, roed: !tiers.length || (bfCur && VALID_CUR.indexOf(bfCur) < 0),
+          import: { type: 'tiers', tiers: tiers, valuta: bfCur || 'USD' }, afsnit: oi });
+    } else if (bf.type === 'per_wm' || bf.type === 'flat' || bf.type === 'per_kg') {
+      const r = Number(bf.rate);
+      const t = bf.type === 'per_wm' ? 'wmFragt' : bf.type === 'flat' ? 'fastFragt' : 'tiers';
+      felt(g, 'Grundfragt', isFinite(r) && r > 0 ? r + ' ' + bfCur + (bf.type === 'per_wm' ? ' pr. w/m' : bf.type === 'per_kg' ? ' pr. kg' : ' fast') : null,
+        { citat: bf.source_quote, roed: bf.rate != null && !(r > 0) || (bfCur && VALID_CUR.indexOf(bfCur) < 0),
+          import: bf.type === 'per_kg' ? { type: 'tiers', tiers: [{ fra: 0, sats: r }], valuta: bfCur || 'DKK' }
+                : bf.type === 'per_wm' ? { type: 'wmFragt', sats: r, valuta: bfCur || 'USD' }
+                : { type: 'fastFragt', sats: r, valuta: bfCur || 'USD' }, afsnit: oi });
+    }
+    if (bf.min_charge != null) {
+      const mc = Number(bf.min_charge);
+      felt(g, 'Minimumssats M', isFinite(mc) && mc > 0 ? mc + ' ' + (bfCur || 'DKK') : null,
+        { citat: bf.source_quote, roed: !(mc > 0), import: { type: 'minFragt', min: mc, valuta: bfCur || 'DKK' }, afsnit: oi });
+    }
+
+    // tillæg
+    const SUR_MAP = { percent_of_base: 'pct', flat: 'fast', per_kg: 'kg', per_wm: 'wm', per_100kg: 'kg100', per_m3: 'm3' };
+    (opt.surcharges || []).forEach(function (su) {
+      const a = Number(su.amount);
+      const styp = SUR_MAP[String(su.type || '').toLowerCase()];
+      const cur = String(su.currency || '').toUpperCase();
+      const negOk = /rabat|discount|kompensation|compensation|fradrag|refund|godtg/i.test(su.name || '');
+      const roed = !styp || !isFinite(a) || (a < 0 && !negOk) || (styp !== 'pct' && cur && VALID_CUR.indexOf(cur) < 0);
+      felt(g, su.name || 'Tillæg', roed ? (su.amount != null ? su.amount + ' ' + (su.currency || '') : null) : (styp === 'pct' ? a + ' %' : a + ' ' + (cur || 'DKK') + (styp === 'kg' ? ' pr. kg' : styp === 'wm' ? ' pr. w/m' : styp === 'kg100' ? ' pr. 100 kg' : styp === 'm3' ? ' pr. m³' : ' fast')),
+        { citat: su.source_quote, roed: roed,
+          import: { type: 'linje', navn: su.name || 'Tillæg', linjetype: styp, sats: a, valuta: styp === 'pct' ? 'DKK' : (cur || 'DKK'),
+                    pctRefs: styp === 'pct' ? ['GRUNDFRAGT'] : [] }, afsnit: oi });
+    });
+
+    // vareværdi, forsikring, transporttid
+    if (opt.goods_value_dkk && opt.goods_value_dkk.value != null) {
+      const v = Number(opt.goods_value_dkk.value);
+      felt(g, 'Vareværdi', v > 0 ? fmt(v) + ' DKK' : null,
+        { citat: opt.goods_value_dkk.source_quote, formel: opt.goods_value_dkk.formula, roed: !(v >= 0),
+          import: { type: 'vareVaerdi', vaerdi: v }, afsnit: oi });
+    }
+    if (opt.insurance_percent && opt.insurance_percent.value != null) {
+      const v = Number(opt.insurance_percent.value);
+      const base = opt.insurance_percent.base === 'value' ? ['VAREVAERDI'] : ['VAREVAERDI', 'GRUNDFRAGT'];
+      felt(g, 'Forsikring', v > 0 ? v + ' %' + (opt.insurance_percent.base === 'value' ? ' af vareværdi' : ' af vareværdi + fragt') : null,
+        { citat: opt.insurance_percent.source_quote, roed: !(v > 0) || v > 100,
+          import: { type: 'linje', navn: 'Forsikring ' + v + ' %', linjetype: 'pct', sats: v, valuta: 'DKK', pctRefs: base }, afsnit: oi });
+    }
+    if (opt.transport_time_days && opt.transport_time_days.value != null) {
+      const v = Number(opt.transport_time_days.value);
+      felt(g, 'Transporttid', v > 0 ? v + ' dage' : null,
+        { citat: opt.transport_time_days.source_quote, roed: !(v > 0),
+          import: { type: 'tid', dage: v }, afsnit: oi });
+    }
+
+    // udledte værdier
+    (opt.derived_values || []).forEach(function (dv) {
+      const v = Number(dv.value);
+      const navn = String(dv.name || '');
+      let imp = null;
+      if (/weight|vaegt|vægt/i.test(navn)) imp = { type: 'vaegt', vaegt: v };
+      else if (/volume|rumfang|m3|m³/i.test(navn)) imp = { type: 'volumen', volumen: v };
+      felt(g, 'Udledt: ' + navn, isFinite(v) ? v : dv.value,
+        { formel: dv.formula || 'udledt', roed: dv.value != null && isFinite(v) && v < 0, import: imp, afsnit: oi });
+    });
+
+    // manglende oplysninger (kun information, ikke import)
+    (opt.missing_information || []).forEach(function (mi) {
+      raekker.push({ gruppe: g, navn: 'Mangler ifølge AI', vaerdi: String(mi), status: 'graa', citat: '', formel: '', note: '', import: null, valgt: false });
+    });
+  });
+
+  return raekker;
+}
+
+// ---------- Overfør godkendte værdier ----------
+function aiOverfoer(raekker) {
+  const godkendt = raekker.filter(function (r) { return r.valgt && r.import; });
+  if (raekker.some(function (r) { return r.status === 'roed'; })) {
+    alert('Der er røde rækker. Ret AI-svaret og analysér igen, før noget overføres.');
+    return;
+  }
+  if (!godkendt.length) { alert('Sæt flueben ved mindst én værdi.'); return; }
+
+  // Er både en direkte vægt og en udledt bruttovægt godkendt, vinder den udledte
+  // (den inkluderer fx transportkassernes vægt). Samme for rumfang.
+  ['vaegt', 'volumen'].forEach(function (typ) {
+    const afsn = {};
+    godkendt.forEach(function (r) { if (r.import && r.import.type === typ) (afsn[r.import.afsnit || 0] = afsn[r.import.afsnit || 0] || []).push(r); });
+    Object.keys(afsn).forEach(function (a) {
+      const grp = afsn[a];
+      if (grp.length < 2) return;
+      const udledt = grp.filter(function (r) { return r.formel; });
+      const behold = udledt.length ? udledt[udledt.length - 1] : grp[grp.length - 1];
+      grp.forEach(function (r) { if (r !== behold) godkendt.splice(godkendt.indexOf(r), 1); });
+    });
+  });
+
+  // ryd og byg fund + afsnitListe ligesom den lokale udtrækning
+  fund = []; afsnitListe = [];
+  const grupper = {};
+  godkendt.forEach(function (r) {
+    const a = (r.import.afsnit != null) ? r.import.afsnit : -1;
+    if (a >= 0) grupper[a] = grupper[a] || (r.gruppe);
+    const d = r.import;
+    const f = { id: uid(), valgt: true, pos: -1, afsnit: a >= 0 ? a + 1 : 0, kilde: r.citat || 'AI', vaerdi: String(r.vaerdi) };
+    switch (d.type) {
+      case 'virksomhed': f.type = 'virksomhed'; f.label = 'Virksomhed'; f.data = { navn: d.navn }; break;
+      case 'kurs': f.type = 'kurs'; f.label = 'Valutakurs 1 ' + d.valuta; f.data = { valuta: d.valuta, kurs: d.kurs }; break;
+      case 'mode': f.type = 'mode'; f.label = 'Transportform'; f.data = { mode: d.mode }; break;
+      case 'incoterm': f.type = 'incoterm'; f.label = 'Leveringsbetingelse'; f.data = { kode: d.kode, sted: d.sted, version: d.version }; break;
+      case 'kolli': f.type = 'kolli'; f.label = 'Kolli'; f.data = { antal: d.antal, l: d.l, b: d.b, h: d.h }; break;
+      case 'vaegt': f.type = 'vaegt'; f.label = 'Bruttovægt'; f.data = { vaegt: d.vaegt }; break;
+      case 'volumen': f.type = 'volumen'; f.label = 'Volumen'; f.data = { volumen: d.volumen }; break;
+      case 'tiers': f.type = 'tiers'; f.label = 'Vægtklasser'; f.data = { tiers: d.tiers, valuta: d.valuta }; break;
+      case 'wmFragt': f.type = 'wmFragt'; f.label = 'Grundfragt pr. w/m'; f.data = { sats: d.sats, valuta: d.valuta }; break;
+      case 'fastFragt': f.type = 'fastFragt'; f.label = 'Fast grundfragt'; f.data = { sats: d.sats, valuta: d.valuta }; break;
+      case 'minFragt': f.type = 'minFragt'; f.label = 'Minimumssats M'; f.data = { min: d.min, valuta: d.valuta }; break;
+      case 'vareVaerdi': f.type = 'vareVaerdi'; f.label = 'Vareværdi i alt'; f.data = { vaerdi: d.vaerdi }; break;
+      case 'tid': f.type = 'tid'; f.label = 'Transporttid'; f.data = { dage: d.dage }; break;
+      case 'linje':
+        f.type = 'linje'; f.label = d.navn;
+        f.data = { navn: d.navn, type: d.linjetype, valuta: d.valuta, sats: d.sats, sats2: 0, min: 0, pctRefs: d.pctRefs || [] };
+        break;
+      default: return;
+    }
+    fund.push(f);
+  });
+
+  Object.keys(grupper).forEach(function (k) {
+    afsnitListe.push({ nr: (+k) + 1, navn: grupper[k], beskrivelse: '', prosa: '', kilde: 'AI' });
+  });
+  markerKonflikter(fund);
+  opdelingTilstand = afsnitListe.length > 1 ? 'auto' : 'samlet';
+  tegnFund();
+  indsaetFund();
+}
+
+// ---------- Kontrolskærm ----------
+let aiRaekker = [];
+const AI_FARVE = {
+  groen: ['border-emerald-800 bg-emerald-950/20', 'Enig / citat fundet i casen'],
+  blaa: ['border-blue-800 bg-blue-950/20', 'Udledt med formel'],
+  gul: ['border-amber-800 bg-amber-950/20', 'Kun fra AI / citat ikke fundet'],
+  roed: ['border-red-800 bg-red-950/30', 'Konflikt eller ugyldig — import blokeres'],
+  graa: ['border-[#1e2836]', 'Mangler']
+};
+
+function tegnAiKontrol() {
+  const boks = $('#aiKontrol');
+  if (!boks) return;
+  if (!aiRaekker.length) { boks.innerHTML = ''; boks.classList.add('hidden'); return; }
+  boks.classList.remove('hidden');
+  const harRoed = aiRaekker.some(function (r) { return r.status === 'roed'; });
+  const grupper = [];
+  aiRaekker.forEach(function (r) { if (grupper.indexOf(r.gruppe) < 0) grupper.push(r.gruppe); });
+
+  let h = '<div class="text-sm font-medium mb-1">Kontrollér AI\'ens oplysninger</div>' +
+    '<div class="text-[11px] text-slate-400 mb-3">Grøn er sat til på forhånd, fordi citatet er fundet i casen. Blå (udledt), gul (kun fra AI) og grå (mangler) skal du selv godkende. Røde rækker blokerer import, til de er rettet i AI-svaret.</div>' +
+    '<div class="flex flex-wrap gap-3 text-[11px] mb-3">' +
+    Object.keys(AI_FARVE).map(function (k) { return '<span class="px-2 py-0.5 rounded border ' + AI_FARVE[k][0] + '">' + AI_FARVE[k][1] + '</span>'; }).join('') + '</div>';
+
+  grupper.forEach(function (grp) {
+    h += '<div class="mb-3"><div class="text-xs font-semibold text-blue-200 mb-1">' + esc(grp) + '</div><div class="space-y-1">';
+    aiRaekker.forEach(function (r, i) {
+      if (r.gruppe !== grp) return;
+      const kan = r.import && r.status !== 'graa' && r.status !== 'roed';
+      h += '<label class="flex items-start gap-2 border rounded-lg p-2 text-xs ' + AI_FARVE[r.status][0] + (kan ? ' cursor-pointer' : '') + '">' +
+        (kan ? '<input type="checkbox" class="aiChk accent-emerald-500 mt-0.5" data-i="' + i + '"' + (r.valgt ? ' checked' : '') + '>' : '<span class="w-3"></span>') +
+        '<div class="flex-1 min-w-0"><span class="font-medium">' + esc(r.navn) + '</span>: <span class="text-blue-200">' + esc(r.vaerdi == null ? '—' : r.vaerdi) + '</span>' +
+        (r.formel ? ' <span class="text-slate-400">(' + esc(r.formel) + ')</span>' : '') +
+        (r.note ? '<div class="text-red-300 mt-0.5">' + esc(r.note) + '</div>' : '') +
+        (r.citat ? '<div class="text-[10px] text-slate-500 mt-0.5 truncate">«' + esc(r.citat) + '»</div>' : '') +
+        '</div></label>';
+    });
+    h += '</div></div>';
+  });
+
+  h += '<button id="aiOverfoer" class="text-sm px-3 py-1.5 rounded-lg font-medium ' +
+    (harRoed ? 'bg-[#1b2534] text-slate-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500') + '"' +
+    (harRoed ? ' disabled' : '') + '>Godkend og overfør til beregning</button>' +
+    (harRoed ? '<div class="text-[11px] text-red-300 mt-2">Der er røde rækker. Bed AI\'en om at rette dem, og analysér svaret igen.</div>'
+             : '<div class="text-[11px] text-slate-500 mt-2">Beregningen er foreløbig og må ikke bruges som facit, før du har kontrolleret alle værdier mod casen.</div>');
+  boks.innerHTML = h;
+}
+
+// ---------- Anbefaling ----------
+function boerAnbefaleAi() {
+  if (delspoergsmaalTekster.length >= 2) return true;
+  if (afsnitListe.length >= 3) return true;
+  if (String(samletTekst).length > 8000) return true;
+  const kurser = (fund || []).filter(function (f) { return f.type === 'kurs'; }).length;
+  const incs = (fund || []).filter(function (f) { return f.type === 'incoterm'; }).length;
+  if (kurser >= 2 || incs >= 2) return true;
+  // kritiske mangler efter lokal udtrækning
+  const har = function (t) { return (fund || []).some(function (f) { return f.type === t; }); };
+  if (fund.length && !(har('tiers') || har('wmFragt') || har('fastFragt'))) return true;
+  return false;
+}
+
+function tegnAiAnbefaling() {
+  const kort = $('#aiKort'), intro = $('#aiIntro');
+  if (!kort || !intro) return;
+  if (boerAnbefaleAi()) {
+    kort.classList.add('border-blue-700');
+    if (!$('#aiBanner')) {
+      const b = document.createElement('div');
+      b.id = 'aiBanner';
+      b.className = 'border border-blue-700 bg-blue-950/30 rounded-xl p-3 text-sm text-slate-200 mb-3';
+      b.innerHTML = 'Denne case ser ud til at have flere delspørgsmål eller transportmuligheder, eller den mangler nogle tal efter den lokale søgning. ' +
+        'For at mindske risikoen for at oplysninger fra forskellige transporter blandes sammen, kan du <span class="font-semibold text-blue-200">generere en prompt</span> og få casen struktureret med din egen AI. Den almindelige Find værdier virker stadig.';
+      kort.insertBefore(b, kort.firstChild.nextSibling);
+    }
+  } else {
+    kort.classList.remove('border-blue-700');
+    const b = $('#aiBanner'); if (b) b.remove();
+  }
+}
+
+function bindAi() {
+  const g = $('#aiGenerer'); if (!g) return;
+  g.addEventListener('click', function () {
+    $('#aiPrompt').value = byggAiPrompt();
+    $('#aiPromptBoks').classList.remove('hidden');
+    $('#aiKontrol').classList.add('hidden');
+  });
+  $('#aiKopierPrompt').addEventListener('click', function () {
+    const t = $('#aiPrompt').value, b = this, gl = b.textContent;
+    const ok = function () { b.textContent = 'Kopieret ✔'; setTimeout(function () { b.textContent = gl; }, 1400); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, function () { fallbackKopi(t, ok); });
+    else fallbackKopi(t, ok);
+  });
+  $('#aiAnalyser').addEventListener('click', function () {
+    const r = parseAiSvar($('#aiSvar').value);
+    if (!r.ok) {
+      aiRaekker = [];
+      $('#aiKontrol').classList.remove('hidden');
+      $('#aiKontrol').innerHTML = '<div class="border border-red-800 bg-red-950/30 rounded-xl p-3 text-sm text-red-200">' + esc(r.fejl) + '</div>';
+      return;
+    }
+    aiRaekker = validerAiSvar(r.data);
+    tegnAiKontrol();
+  });
+  $('#aiKontrol').addEventListener('change', function (e) {
+    if (!e.target.classList.contains('aiChk')) return;
+    const i = +e.target.dataset.i;
+    if (aiRaekker[i]) aiRaekker[i].valgt = e.target.checked;
+  });
+  $('#aiKontrol').addEventListener('click', function (e) {
+    if (e.target.id === 'aiOverfoer' && !e.target.disabled) aiOverfoer(aiRaekker);
+  });
+}
+
+
 function bind() {
   $$('.tabbtn').forEach(b => b.addEventListener('click', () => {
     $$('.tabbtn').forEach(x => { x.className = 'tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap'; });
@@ -3465,6 +3940,8 @@ function bind() {
   });
   $$('.vaegtInput').forEach(i => i.addEventListener('input', () => tegnPoint(scenarierForCase())));
 
+  bindAi();
+
   // filer
   const drop = $('#drop');
   drop.addEventListener('click', () => $('#filInput').click());
@@ -3510,6 +3987,9 @@ function bind() {
       ' bliver ryddet. Gemte cases bliver liggende.')) return;
     fund = []; afsnitListe = []; samletTekst = ''; opdelingTilstand = 'auto'; aktivCase = '';
     delspoergsmaalTekster = []; valgtDelspoergsmaal = -1; delspoergsmaalPraeamb = '';
+    aiRaekker = []; if ($('#aiKontrol')) { $('#aiKontrol').innerHTML = ''; $('#aiKontrol').classList.add('hidden'); }
+    if ($('#aiPromptBoks')) $('#aiPromptBoks').classList.add('hidden');
+    if ($('#aiSvar')) $('#aiSvar').value = '';
     gemScenarier([]);
     state = tomState();
     fyldFormular();

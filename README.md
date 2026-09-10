@@ -16,6 +16,17 @@ Du sætter selv flueben ved det, der skal med, og trykker derefter Sæt ind i be
 Casen deles op i transportmuligheder, hvis den stiller flere tilbud op mod hinanden, og hver mulighed
 regnes for sig. Passer opdelingen ikke, kan du med ét klik vælge at regne det hele som én beregning.
 
+Har casen flere delspørgsmål eller transportmuligheder, deler siden den op og lader dig vælge,
+hvilket delspørgsmål du vil regne på. Tal fra ét delspørgsmål blandes ikke med et andet.
+
+Til lange eller komplekse cases kan siden lave en **prompt** til din egen AI (ChatGPT, Claude, Gemini).
+AI'en opdeler casen og beskriver hver transport for sig. Du kopierer prompten selv, indsætter AI'ens
+JSON-svar tilbage, og siden validerer det: hvert citat tjekkes mod casen, og hver værdi får en farve
+(grøn = citat fundet, blå = udledt, gul = kun fra AI, rød = ugyldig, grå = mangler). Kun godkendte
+værdier overføres, og røde blokerer import. Der er ingen AI i siden og ingen API-nøgle. Intet sendes
+automatisk. Funktionen anbefales kun, når casen er lang eller mangler tal — den mindsker risikoen for
+sammenblanding, den garanterer ikke et korrekt resultat.
+
 En tjekliste viser hvad der mangler: rumfang, vægt, grundfragt, valutakurs, tillæg og vareværdi.
 Siden gætter ikke stiltiende. Er kursen ikke oplyst i casen, siger den det, i stedet for at bruge en
 standardkurs uden at nævne det.
