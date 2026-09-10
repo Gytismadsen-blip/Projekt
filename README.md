@@ -1,4 +1,4 @@
-# Fragtberegner
+# FragtAnalyse
 
 Værktøj til transportøkonomi: fragtpligtig vægt, transportpris og totalomkostning for luft-, sø-, bane- og vejfragt.
 Bygget til faget Distribution på logistikøkonomuddannelsen, men lavet så det kan bruges på en hvilken som helst case.
