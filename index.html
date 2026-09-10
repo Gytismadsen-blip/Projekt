@@ -31,8 +31,6 @@
       <div class="text-[11px] text-slate-500">Fragtpligtig vægt, transportpris og totalomkostning &mdash; luft, sø, bane og vej</div>
     </div>
     <div class="ml-auto flex items-center gap-2">
-      <select id="presetVaelger" class="text-sm" autocomplete="off"></select>
-      <button id="indlaesPreset" class="text-sm bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg font-medium">Indlæs</button>
     </div>
   </div>
   <div class="max-w-6xl mx-auto px-4 flex gap-1 text-sm overflow-x-auto">
@@ -1247,99 +1245,6 @@ function visFragtBoks() {
 }
 
 // ============================================================
-//  Cases
-// ============================================================
-const PRESETS = {
-  tom: { navn: '— Tom beregning —', lav: () => tomState() },
-
-  airBirgers: {
-    navn: 'Air Birgers Møbler — Bangkok til Rønne',
-    lav: () => Object.assign(tomState(), {
-      caseNavn: 'Air Birgers Møbler — Bangkok til Rønne', antalForsendelser: 1,
-      kolli: [{ antal: 3, l: 25, b: 85, h: 102, vaegt: 0 }, { antal: 2, l: 95, b: 85, h: 120, vaegt: 0 }, { antal: 2, l: 45, b: 35, h: 29, vaegt: 0 }],
-      vaegtKilde: 'manuel', vaegtTotal: 115,
-      mode: 'luft', faktor: 166.67, afrunding: 'kg',
-      fragtType: 'trappe', valutaFragt: 'USD',
-      tiers: [{ fra: 45, sats: 3.20 }, { fra: 100, sats: 2.90 }, { fra: 300, sats: 2.70 }, { fra: 500, sats: 2.40 }],
-      linjer: [
-        nyLinje({ navn: 'Brændstoftillæg', type: 'kg', valuta: 'USD', sats: 0.50 }),
-        nyLinje({ navn: 'Sikkerhedstillæg', type: 'kg', valuta: 'USD', sats: 0.12 }),
-        nyLinje({ navn: 'Fragt Billund–Viborg', type: 'fast', valuta: 'DKK', sats: 280 }),
-        nyLinje({ navn: 'Fragt Viborg–Rønne', type: 'fast', valuta: 'DKK', sats: 700 })
-      ],
-      transportTid: 3, frekvens: 20, paalidelighed: 4, afstand: 8600, co2Faktor: 500
-    })
-  },
-
-  seaBirgers1: {
-    navn: 'Sea Birgers Møbler — 1: samlecontainer 8 m³ ugentligt',
-    lav: () => {
-      const s = Object.assign(tomState(), {
-        caseNavn: 'Sea Birgers — 1: samlecontainer 8 m³', antalForsendelser: 4,
-        inputType: 'direkte', volumenDirekte: 8, antalKolliDirekte: 0,
-        vaegtKilde: 'manuel', vaegtTotal: 0,
-        mode: 'soe', faktor: 1000, afrunding: 'kg',
-        fragtType: 'wm', valutaFragt: 'USD', wmSats: 65,
-        transportTid: 28, frekvens: 4, paalidelighed: 5, afstand: 0, co2Faktor: 12
-      });
-      const caf = nyLinje({ navn: 'CAF 6 %', type: 'pct', sats: 6, pctRefs: ['GRUNDFRAGT'] });
-      const baf = nyLinje({ navn: 'BAF', type: 'wm', valuta: 'USD', sats: 29 });
-      const thc = nyLinje({ navn: 'THC', type: 'thc', valuta: 'DKK', sats: 22, sats2: 75, min: 275 });
-      const goods = nyLinje({ navn: 'Goods Fee to Harbour', type: 'fast', valuta: 'DKK', sats: 152 });
-      const fee = nyLinje({ navn: 'LE honorar 10 %', type: 'pct', sats: 10, pctRefs: ['GRUNDFRAGT', caf.id, baf.id, thc.id, goods.id] });
-      s.linjer = [caf, baf, thc, goods, fee];
-      return s;
-    }
-  },
-
-  seaBirgers2: { navn: 'Sea Birgers Møbler — 2: 20" container', lav: () => containerCase('Sea Birgers — 2: 20" container', 1600, 635, 1000, 30) },
-  seaBirgers3: { navn: 'Sea Birgers Møbler — 3: 40" container', lav: () => containerCase('Sea Birgers — 3: 40" container', 1900, 1270, 2000, 30) },
-
-  danmeat: {
-    navn: 'DanMeat — Grindsted til Verona (luftfragt)',
-    lav: () => {
-      const s = Object.assign(tomState(), {
-        caseNavn: 'DanMeat — prøveforsendelse til Verona', antalForsendelser: 1,
-        kolli: [{ antal: 14, l: 80, b: 40, h: 60, vaegt: 0 }],
-        vaegtKilde: 'manuel', vaegtTotal: 320, vareVaerdi: 28000,
-        mode: 'luft', faktor: 166.67, afrunding: 'kg',
-        fragtType: 'trappe', valutaFragt: 'EUR', minFragt: 51.09,
-        tiers: [{ fra: 100, sats: 5.11 }, { fra: 300, sats: 3.94 }, { fra: 500, sats: 3.30 }],
-        transportTid: 1, frekvens: 20, paalidelighed: 4, afstand: 1300, co2Faktor: 500
-      });
-      s.linjer = [
-        nyLinje({ navn: 'Forsikring 0,5 %', type: 'pct', sats: 0.5, pctRefs: ['VAREVAERDI', 'GRUNDFRAGT'] }),
-        nyLinje({ navn: 'Omladning i Verona', type: 'fast', valuta: 'EUR', sats: 150 })
-      ];
-      return s;
-    }
-  }
-};
-
-function containerCase(navn, fragt, baf, feeder, dage) {
-  const s = Object.assign(tomState(), {
-    caseNavn: navn, antalForsendelser: 1,
-    inputType: 'direkte', volumenDirekte: 0, antalKolliDirekte: 1,
-    vaegtKilde: 'manuel', vaegtTotal: 0,
-    mode: 'soe', faktor: 1000, afrunding: 'kg',
-    fragtType: 'fast', valutaFragt: 'USD', fastFragt: fragt,
-    transportTid: dage, frekvens: 4, paalidelighed: 3, afstand: 0, co2Faktor: 12
-  });
-  const caf = nyLinje({ navn: 'CAF 6 %', type: 'pct', sats: 6, pctRefs: ['GRUNDFRAGT'] });
-  const bafL = nyLinje({ navn: 'BAF', type: 'fast', valuta: 'USD', sats: baf });
-  const ams = nyLinje({ navn: 'AMS fee', type: 'fast', valuta: 'USD', sats: 40 });
-  const thc = nyLinje({ navn: 'THC', type: 'fast', valuta: 'DKK', sats: 1100 });
-  const isps = nyLinje({ navn: 'ISPS', type: 'fast', valuta: 'DKK', sats: 110 });
-  const truck = nyLinje({ navn: 'Trucking Århus–Viborg–Århus', type: 'fast', valuta: 'DKK', sats: 1600 });
-  const truck2 = nyLinje({ navn: 'Trucking Århus–Viborg–Hamburg (alternativ)', type: 'fast', valuta: 'DKK', sats: 3400, aktiv: false });
-  const komp = nyLinje({ navn: 'Feeder-kompensation (kun ved Hamburg)', type: 'fast', valuta: 'DKK', sats: -feeder, aktiv: false });
-  const fuel = nyLinje({ navn: 'Fuel Fee 12 % af trucking', type: 'pct', sats: 12, pctRefs: [truck.id] });
-  const fee = nyLinje({ navn: 'LE honorar 10 %', type: 'pct', sats: 10, pctRefs: ['GRUNDFRAGT', caf.id, bafL.id, ams.id, thc.id, isps.id, truck.id, truck2.id, komp.id, fuel.id] });
-  s.linjer = [caf, bafL, ams, thc, isps, truck, truck2, komp, fuel, fee];
-  return s;
-}
-
-// ============================================================
 //  Filindlæsning — ren tekstudtrækning, ingen AI
 // ============================================================
 let samletTekst = '';
@@ -2016,7 +1921,6 @@ const FUND_IKON = { kolli: '📦', vaegt: '⚖️', tiers: '📊', minFragt: '�
 
 // Hvordan skal casen laeses? Genkendelsen kan tage fejl paa en ukendt case,
 // saa valget ligger hos brugeren.
-let valgtPreset = 'tom';   // hvilken eksempelcase brugeren sidst har valgt
 let opdelingTilstand = 'auto';   // 'auto' = én beregning pr. mulighed, 'samlet' = alt i én
 
 function tegnOpdeling() {
@@ -2301,8 +2205,6 @@ function bind() {
     if (b.dataset.tab === 'vurdering') tegnResultat();
   }));
 
-  $('#presetVaelger').innerHTML = Object.keys(PRESETS).map(k => '<option value="' + k + '">' + esc(PRESETS[k].navn) + '</option>').join('');
-  $('#indlaesPreset').addEventListener('click', () => { valgtPreset = $('#presetVaelger').value; state = PRESETS[valgtPreset].lav(); fyldFormular(); });
 
   $('#mode').innerHTML = Object.keys(MODES).map(k => '<option value="' + k + '">' + MODES[k].navn + '</option>').join('');
   $('#mode').addEventListener('change', e => {
@@ -2516,13 +2418,11 @@ tegnFund();
 // Browseren kan genskabe gamle feltvaerdier efter en genindlaesning.
 // Naar siden vises, skrives alt derfor tilbage fra beregningen selv.
 window.addEventListener('pageshow', () => {
-  $('#presetVaelger').value = valgtPreset;
   fyldFormular();
 });
 
-// Start med en tom beregning. Eksempelcasene ligger i menuen oeverst.
+// Start med en tom beregning.
 state = tomState();
-$('#presetVaelger').value = 'tom';
 fyldFormular();
 </script>
 </body>
