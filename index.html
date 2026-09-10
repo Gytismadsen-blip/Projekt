@@ -97,6 +97,7 @@
       </div>
     </div>
     <p class="text-xs text-slate-400 mb-3">Kontrollér altid tallene mod casen. Mønstergenkendelse kan misse noget, og et forkert udgangstal giver et forkert facit.</p>
+    <div id="delspoergsmaal" class="mb-3"></div>
     <div id="opdeling" class="mb-3"></div>
     <div id="tjekliste" class="mb-3"></div>
     <div id="fundListe" class="space-y-2"></div>
@@ -692,6 +693,8 @@ function mangler(s, r) {
   const m = [];
   if (!(r.grundfragtOrig > 0)) m.push('grundfragten er ikke fundet eller udfyldt');
   if (s.fragtType !== 'fast' && !(r.volumen > 0) && !(r.faktiskVaegt > 0)) m.push('hverken vægt eller rumfang er oplyst');
+  else if (s.fragtType === 'trappe' && s.mode === 'luft' && !(r.volumen > 0) && r.faktiskVaegt > 0)
+    m.push('rumfanget er ikke oplyst, så volumenvægten kan ikke kontrolleres, og ved luftfragt er det ofte volumenvægten, der styrer prisen');
   if (s.inputType === 'kolli' && s.kolliAntalUkendt) m.push('antallet af kolli står ikke i casen, så der er regnet med 1');
   const brugte = Array.from(new Set([s.valutaFragt].concat(s.linjer.filter(l => l.aktiv && l.type !== 'pct').map(l => l.valuta)))).filter(v => v && v !== 'DKK');
   brugte.forEach(v => { if (!(num(r.kurs[v]) > 0)) m.push('kursen for ' + v + ' mangler'); });
@@ -1516,6 +1519,7 @@ function aabnGemtCase(i) {
   fund = c.fund || [];
   afsnitListe = c.afsnit || [];
   opdelingTilstand = c.opdeling || 'auto';
+  delspoergsmaalTekster = []; valgtDelspoergsmaal = -1;
   aktivCase = (c.scenarier || []).length ? ((c.scenarier[0] || {}).case || '') : (caseNavnFraFiler() || '');
   gemScenarier(c.scenarier || []);
   $('#filListe').innerHTML = '<div class="text-slate-300 text-sm">Hentet fra gemte cases: ' + esc(c.navn) +
@@ -2129,6 +2133,36 @@ function visFragtBoks() {
 let samletTekst = '';
 let fund = [];
 let afsnitListe = [];   // transportmuligheder fundet i casen
+let delspoergsmaalTekster = [];   // delspørgsmål i en lang case
+let delspoergsmaalPraeamb = '';
+let valgtDelspoergsmaal = -1;
+
+function vaelgDelspoergsmaal(i) {
+  valgtDelspoergsmaal = i;
+  fund = []; afsnitListe = [];
+  const d = delspoergsmaalTekster[i];
+  samletTekst = '===== ' + d.titel + ' =====' + String.fromCharCode(10) + d.tekst;
+  tilfoejFund(findVaerdier(d.tekst), d.titel);
+  $('#tekstDump').textContent = samletTekst.slice(0, 60000);
+  tegnDelspoergsmaal();
+  tegnFund();
+}
+
+function tegnDelspoergsmaal() {
+  const boks = $('#delspoergsmaal');
+  if (!boks) return;
+  if (!delspoergsmaalTekster.length) { boks.innerHTML = ''; return; }
+  boks.innerHTML = '<div class="border border-blue-900 bg-blue-950/20 rounded-xl p-3">' +
+    '<div class="text-sm text-slate-300 mb-2">Denne case har flere delspørgsmål. Tal fra ét delspørgsmål må ikke blandes med et andet. ' +
+    '<span class="font-semibold text-blue-200">Vælg det, du vil regne på:</span></div>' +
+    '<div class="flex flex-wrap gap-2">' +
+    delspoergsmaalTekster.map((d, i) =>
+      '<button class="delspBtn text-left px-3 py-1.5 rounded-lg border text-xs ' +
+      (i === valgtDelspoergsmaal ? 'border-blue-500 bg-blue-950/40 text-white' : 'border-[#2b3542] hover:border-slate-500 text-slate-300') +
+      '" data-i="' + i + '">' + esc(d.titel) + '</button>').join('') + '</div>' +
+    (valgtDelspoergsmaal < 0 ? '<div class="text-[11px] text-amber-300 mt-2">Der er ikke valgt et delspørgsmål endnu, så der er ikke søgt efter tal.</div>' : '') +
+    '</div>';
+}
 
 // Laegger nye fund oveni de gamle og holder muligheds-numrene adskilt pr. fil
 function tilfoejFund(res, kilde) {
@@ -2266,6 +2300,63 @@ function erGrundfragtLinje(l) {
   if (/^\s*Q\s*\d/i.test(l)) return false;
   if (/exchange\s*rate|valutakurs|\bkurs\b|rate of exchange/i.test(l)) return false;
   return /\b(freight|fragt|rate|takst|leje|rent|hire|transport|carriage|pris|price|offer|tilbud)\b/i.test(l);
+}
+
+// Lange eksamenscases har flere delspørgsmål: "Question 3", "Trial shipment
+// to Verona", "Transport to Shanghai". Tal fra ét delspørgsmål må ikke blandes
+// med et andet, så brugeren skal vælge hvilket der regnes på.
+const DELSP_OVERSKRIFT = new RegExp(
+  '^[ \\t]*(?:' +
+  '(?:question|spørgsmål|opgave|task|assignment|part|del|afsnit|section|case)[ \\t.:#\\-]*\\d+' +   // Question 3, Opgave 2
+  '|(?:trial\\s+shipment|prøveforsendelse|sample\\s+shipment)[^\\n]{0,40}' +                        // Trial shipment to Verona
+  '|transport(?:ation)?\\s+(?:to|til)\\s+[A-ZÆØÅ][\\wæøåÆØÅ]{2,20}(?:,[ \\t]*[A-ZÆØÅ][\\wæøåÆØÅ]{2,20})?[ \\t]*' + // Transport to Shanghai
+  ')[ \\t]*$', 'i');
+// en linje med kun VERSALER, 2-8 ord, ingen tal, ligner en sektionstitel
+function erVersalOverskrift(l) {
+  const t = String(l).trim();
+  if (t.length < 8 || t.length > 64 || /\d/.test(t)) return false;
+  if (!/^[A-ZÆØÅ][A-ZÆØÅ ,'&/\-–]*[A-ZÆØÅ]$/.test(t)) return false;
+  const ord = t.split(/\s+/).length;
+  return ord >= 2 && ord <= 8;
+}
+
+function findDelspoergsmaal(tekst) {
+  const t = String(tekst);
+  if (t.length < 3000) return null;                       // korte cases deles ikke
+  const linjer = t.split('\n');
+  const heads = [];
+  let pos = 0;
+  linjer.forEach(l => {
+    const start = pos; pos += l.length + 1;
+    const ren = l.trim();
+    if (!ren) return;
+    let m = ren.match(DELSP_OVERSKRIFT);
+    if (m) {
+      // "Transport to oven – 10 min" er et procestrin, ikke en sektion
+      if (/\d+\s*(?:min|sek|timer|hours?)\b/i.test(ren)) return;
+      heads.push({ pos: start, titel: ren.replace(/\s{2,}/g, ' ').slice(0, 70) });
+    } else if (erVersalOverskrift(ren)) {
+      heads.push({ pos: start, titel: ren, versal: true });
+    }
+  });
+  // Firmanavne, dokumenttitlen og indholdslabels er ikke delspørgsmål
+  const junk = /\b(A\/S|ApS|A\.m\.b\.a\.|I\/S|K\/S|Ltd|GmbH|AG|Inc|LLC)\b|^(THE\s+(PRODUCTS?|COMPANY|CASE|MARKET|COMPANIES)|BAGGRUND|INDLEDNING|BILAG|APPENDIX|INDHOLD|INDHOLDSFORTEGNELSE|FORORD|LITTERATUR)\b/i;
+  const rene = heads.filter((h, i) =>
+    (i === 0 || h.pos - heads[i - 1].pos > 200) &&
+    !junk.test(h.titel) &&
+    !(h.pos < 5));
+  if (rene.length < 2) return null;
+
+  const foerste = rene[0].pos;
+  const praeamb = t.slice(0, foerste).trim();
+  const dele = rene.map((h, i) => ({
+    titel: h.titel,
+    tekst: t.slice(h.pos, i + 1 < rene.length ? rene[i + 1].pos : t.length).trim()
+  }));
+  // kun dele med reelt indhold og mindst ét tal
+  const brugbare = dele.filter(d => d.tekst.length > 150 && /\d/.test(d.tekst));
+  if (brugbare.length < 2) return null;
+  return { praeamble: praeamb, dele: brugbare };
 }
 
 function findAfsnit(tekst) {
@@ -2476,7 +2567,7 @@ function findVaerdier(tekst) {
   }
 
   // --- vægt ---
-  const vRe = new RegExp('(?:samlet\\s+)?(?:brutto)?(?:v(?:æ|ae)gt|weight|gross\\s+weight)\\D{0,25}' + N + '\\s*(kg|kilo|tons?|t\\b)', 'gi');
+  const vRe = new RegExp('(?:samlet\\s+)?(?:brutto)?(?:v(?:æ|ae)gt|weigh(?:s|ing)?|weight|gross\\s+weight|vejer)\\D{0,25}' + N + '\\s*(kg|kilo|tons?|t\\b)', 'gi');
   while ((m = vRe.exec(t)) !== null) {
     let v = num(m[1]);
     if (/^t/i.test(m[2])) v *= 1000;
@@ -2493,6 +2584,7 @@ function findVaerdier(tekst) {
   const qRe = new RegExp('\\bQ\\s*(\\d{1,4})\\s*[:\\-]?\\s*(?:' + VAL + '\\s*)?' + N + '\\s*' + VAL + '?', 'gi');
   const tiers = [];
   let tierPos = -1;
+  let tierValuta = '';
   while ((m = qRe.exec(t)) !== null) {
     const fra = parseInt(m[1], 10), sats = num(m[3]);
     if (sats > 0 && sats < 1000 && fra >= 0 && fra <= 10000) {
@@ -2501,11 +2593,39 @@ function findVaerdier(tekst) {
       tiers.push({ fra: fra, sats: sats, val: m[2] || m[4] });
     }
   }
+  // Luftfragt-tariffer skrevet uden Q: linjer som "N 50,00 per kg" og "45 29,00 per kg",
+  // ofte med en "Min. 650" ovenover. Kun naar mindst tre saadanne linjer haenger sammen.
+  if (!tiers.length) {
+    const linjeRe = /(?:^|\n)[ \t]*(N|\d{1,4})[ \t]+(?:(USD|EUR|DKK)[ \t]*)?(\d{1,4}(?:[.,]\d{1,2})?)[ \t]*(?:(USD|EUR|DKK)[ \t]*)?(?:per|pr\.?|\/)[ \t]*kg\b/gi;
+    let lm, raa = [], sidst = -99;
+    while ((lm = linjeRe.exec(t)) !== null) {
+      const fra = /^n$/i.test(lm[1]) ? 0 : parseInt(lm[1], 10);
+      const sats = num(lm[3]);
+      if (sats <= 0 || sats > 1000 || fra < 0 || fra > 10000) continue;
+      if (raa.length && lm.index - sidst > 300) raa = [];
+      raa.push({ fra: fra, sats: sats, val: lm[2] || lm[4], pos: lm.index });
+      sidst = lm.index + lm[0].length;
+    }
+    if (raa.length >= 3) {
+      raa.forEach(function (x) { reserver({ index: x.pos, 0: '' }); });
+      var foranTab = t.slice(Math.max(0, raa[0].pos - 400), raa[0].pos);
+      var iCur = (foranTab.match(/\b(?:in|i)\s+(USD|EUR|DKK)\b/i) || [])[1];
+      var val = (iCur || valutaAf(raa.find(function (x) { return x.val; }) ? raa.find(function (x) { return x.val; }).val : '') || linjeValuta(raa[0].pos) || 'DKK').toUpperCase();
+      tierValuta = val;
+      raa.forEach(function (x) { tiers.push(x); });
+      tierPos = tierPos < 0 ? raa[0].pos : tierPos;
+      var foran = t.slice(Math.max(0, raa[0].pos - 120), raa[0].pos);
+      var mm = foran.match(/\bmin(?:imum)?\.?\s*(?:rate|charge|sats)?\s*[:\-]?\s*(?:USD|EUR|DKK\s*)?(\d{2,5}(?:[.,]\d{1,2})?)/i);
+      if (mm) push({ pos: raa[0].pos, type: 'minFragt', label: 'Minimumssats M',
+        vaerdi: fmt(num(mm[1])) + ' ' + val, kilde: mm[0].trim(), data: { min: num(mm[1]), valuta: val } });
+    }
+  }
+
   if (tiers.length) {
-    const val = valutaAf(tiers.find(x => x.val) ? tiers.find(x => x.val).val : '');
-    push({ pos: tierPos, type: 'tiers', label: 'Vægtklasser (Q-satser)',
-           vaerdi: tiers.map(x => 'Q' + x.fra + ': ' + fmt(x.sats, 2)).join(' · ') + (val ? ' ' + val : ''),
-           kilde: 'trappesats', data: { tiers: tiers.map(x => ({ fra: x.fra, sats: x.sats })), valuta: val || 'USD' } });
+    const val = tierValuta || valutaAf(tiers.find(x => x.val) ? tiers.find(x => x.val).val : '') || linjeValuta(tierPos) || 'USD';
+    push({ pos: tierPos, type: 'tiers', label: 'Vægtklasser (trappesats)',
+           vaerdi: tiers.map(x => (x.fra === 0 ? 'N' : x.fra) + ': ' + fmt(x.sats, 2)).join(' · ') + ' ' + val,
+           kilde: 'trappesats', data: { tiers: tiers.map(x => ({ fra: x.fra, sats: x.sats })), valuta: val } });
   }
 
   // --- flad fragtsats pr. kg, fx "Freight: 3 DKK pr. kg." ---
@@ -2891,8 +3011,13 @@ function fundKort(f) {
 
 function tegnFund() {
   $('#fundAntal').textContent = fund.length + ' fund';
+  tegnDelspoergsmaal();
   tegnOpdeling();
   tegnTjekliste();
+  if (delspoergsmaalTekster.length && valgtDelspoergsmaal < 0) {
+    $('#fundListe').innerHTML = '<div class="text-sm text-amber-300">Vælg først et delspørgsmål ovenfor. Der er ikke søgt efter tal endnu.</div>';
+    return;
+  }
   if (!fund.length) { $('#fundListe').innerHTML = '<div class="text-sm text-slate-400">Ingen værdier fundet endnu. Upload en case eller indsæt teksten ovenfor.</div>'; return; }
 
   let h = '';
@@ -2900,6 +3025,10 @@ function tegnFund() {
     h += '<div class="border border-amber-800 bg-amber-950/20 rounded-xl p-3 text-sm text-slate-300 mb-3">' +
       'Der er fundet ' + fund.length + ' værdier. Så mange tal står der sjældent i én case. ' +
       'Tjek om du har uploadet et kompendium eller en hel bog ved siden af casen, og ryd op med knappen Ryd alt.</div>';
+  }
+  if (delspoergsmaalTekster.length && valgtDelspoergsmaal < 0) {
+    boks.innerHTML = '<div class="text-sm text-slate-400">Vælg først et delspørgsmål ovenfor.</div>';
+    return;
   }
   if (afsnitListe.length) {
     h += '<div class="border border-blue-900 bg-blue-950/20 rounded-xl p-3 text-sm text-slate-300 mb-3">' +
@@ -2956,7 +3085,14 @@ function byggStateFraFund(valgte, navn, grund) {
   if (v.length) { s.vaegtKilde = 'manuel'; s.vaegtTotal = v[0].data.vaegt; }
 
   const ti = valgte.find(f => f.type === 'tiers');
-  if (ti) { s.fragtType = 'trappe'; s.tiers = ti.data.tiers.slice(); if (ti.data.valuta) s.valutaFragt = ti.data.valuta; }
+  if (ti) {
+    s.fragtType = 'trappe'; s.tiers = ti.data.tiers.slice(); if (ti.data.valuta) s.valutaFragt = ti.data.valuta;
+    // en trappesats pr. kg er luftfragt, medmindre casen tydeligt siger andet
+    if (/\b(airport|airfreight|air\s?freight|luftfragt|fragtfly|cargo\s+aircraft|lufthavn|by\s+air)\b/i.test(samletTekst) ||
+        (!/\b(sea|ocean|vessel|søfragt|skib|containership|rederi)\b/i.test(samletTekst) && ti.data.tiers.length && ti.data.tiers.some(x => x.fra <= 45))) {
+      s.mode = 'luft'; s.faktor = 1000 / 6;
+    }
+  }
 
   const mf = valgte.find(f => f.type === 'minFragt');
   if (mf) { s.minFragt = mf.data.min; if (mf.data.valuta) s.valutaFragt = mf.data.valuta; }
@@ -3119,11 +3255,22 @@ async function haandterFiler(filer) {
         linje.className = 'flex items-start gap-2 text-slate-300 flex-wrap';
         continue;
       }
-      const nye = tilfoejFund(findVaerdier(tekst), file.name);
       const stor = tekst.length > 300000;
-      linje.innerHTML = '<span class="text-emerald-400">✔</span> ' + esc(file.name) +
-        ' <span class="text-xs text-slate-500">(' + nye + ' nye fund, ' + fmt(tekst.length / 1000, 1) + ' k tegn)</span>' +
-        (stor ? '<div class="text-[11px] text-amber-300 ml-6">Meget stor fil. Det ligner en bog eller et kompendium frem for en case. Upload helst kun selve casen og dens bilag, ellers drukner de rigtige tal i støj.</div>' : '');
+      const delsp = findDelspoergsmaal(tekst);
+      let nye;
+      if (delsp && !delspoergsmaalTekster.length) {
+        // Lang case med flere delspørgsmål: lad brugeren vælge ét
+        delspoergsmaalTekster = delsp.dele.map(d => ({ titel: d.titel, tekst: d.tekst }));
+        delspoergsmaalPraeamb = delsp.praeamble;
+        nye = 0;
+        linje.innerHTML = '<span class="text-blue-400">?</span> ' + esc(file.name) +
+          '<div class="text-[11px] text-blue-200 ml-6">Casen har ' + delsp.dele.length + ' delspørgsmål. Vælg nedenfor, hvilket du vil regne på.</div>';
+      } else {
+        nye = tilfoejFund(findVaerdier(tekst), file.name);
+        linje.innerHTML = '<span class="text-emerald-400">✔</span> ' + esc(file.name) +
+          ' <span class="text-xs text-slate-500">(' + nye + ' nye fund, ' + fmt(tekst.length / 1000, 1) + ' k tegn)</span>' +
+          (stor ? '<div class="text-[11px] text-amber-300 ml-6">Meget stor fil. Det ligner en bog eller et kompendium frem for en case. Upload helst kun selve casen og dens bilag, ellers drukner de rigtige tal i støj.</div>' : '');
+      }
       linje.className = 'flex items-start gap-2 text-slate-300 flex-wrap';
     } catch (e) {
       const tom = /empty|data length = 0|zero bytes/i.test(String(e.message));
@@ -3362,6 +3509,7 @@ function bind() {
       'Uploadede filer, fundne værdier' + (antalMul ? ' og ' + antalMul + ' beregnede muligheder' : '') +
       ' bliver ryddet. Gemte cases bliver liggende.')) return;
     fund = []; afsnitListe = []; samletTekst = ''; opdelingTilstand = 'auto'; aktivCase = '';
+    delspoergsmaalTekster = []; valgtDelspoergsmaal = -1; delspoergsmaalPraeamb = '';
     gemScenarier([]);
     state = tomState();
     fyldFormular();
@@ -3392,6 +3540,10 @@ function bind() {
   $('#opdeling').addEventListener('change', e => {
     if (e.target.name !== 'opdeling') return;
     opdelingTilstand = e.target.value;
+  });
+  $('#delspoergsmaal').addEventListener('click', e => {
+    const b = e.target.closest('.delspBtn');
+    if (b) vaelgDelspoergsmaal(+b.dataset.i);
   });
 
   $('#vaelgAlle').addEventListener('click', () => {
