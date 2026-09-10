@@ -374,7 +374,7 @@
     <div class="mt-4 border border-amber-800 bg-amber-950/20 rounded-xl p-3">
       <div class="text-sm font-medium text-amber-300 mb-1">Vær kritisk over for kompendiets tal for bane og vej EU</div>
       <p class="text-xs text-slate-300">De to kolonner passer ikke sammen for bane og international vejfragt. Hvis 1 m³ er 333,3 kg, så er 1 ton lig 3,0 m³ &mdash; ikke 3,33 m³. Kompendiets eget regneeksempel bruger 3,4 / 3,33 og når 1,021 måleton, men skriver samtidig 3,4 × 0,333 = 1,021, hvilket giver 1,133. De to linjer kan ikke begge være rigtige.</p>
-      <p class="text-xs text-slate-300 mt-2">Kalkulatoren regner med kolonnen 1 m³ = 333,33 kg og får 1.134 kg. Bruger din underviser i stedet 1 ton = 3,33 m³, så skriv 300 i faktorfeltet, så får du 1.021 kg. Skriv altid ned hvilken faktor du har brugt &mdash; det er den slags forudsætninger, der giver point.</p>
+      <p class="text-xs text-slate-300 mt-2">Fragtberegneren regner med kolonnen 1 m³ = 333,33 kg og får 1.134 kg. Bruger din underviser i stedet 1 ton = 3,33 m³, så skriv 300 i faktorfeltet, så får du 1.021 kg. Skriv altid ned hvilken faktor du har brugt &mdash; det er den slags forudsætninger, der giver point.</p>
     </div>
   </div>
 
@@ -1014,7 +1014,7 @@ function tegnResultat() {
   vt += row('Måleton (w/m)', fmt(r.maaleton, 3));
   vt += row('Stuvefaktor (m³ pr. ton)', r.faktiskVaegt > 0 ? fmt(r.volumen / (r.faktiskVaegt / 1000), 2) : '&ndash;');
   vt += '</tbody></table>';
-  $('#vaegtResultat').innerHTML = vt;
+  $('#vaegtResultat').innerHTML = valider().length ? '' : vt;
 
   if (s.fragtType === 'trappe' && r.kandidater.length) {
     let t = '<div class="text-xs text-slate-400 mb-2">Alle vægtklasser afprøvet. Den billigste vælges:</div><table class="text-sm min-w-[440px]"><thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Der betales for</th><th class="text-left">Sats</th><th class="text-right">Grundfragt</th><th></th></tr></thead><tbody class="divide-y divide-[#1e2836]">';
@@ -1030,6 +1030,7 @@ function tegnResultat() {
     }
     $('#trappeResultat').innerHTML = t;
   } else $('#trappeResultat').innerHTML = '';
+  if (valider().length) $('#trappeResultat').innerHTML = '';
 
   let h = '<table class="text-sm w-full min-w-[640px]"><thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Post</th><th class="text-left">Udregning</th><th class="text-right">Beløb</th><th class="text-right">DKK</th></tr></thead><tbody class="divide-y divide-[#1e2836]">';
   h += '<tr><td class="font-medium">Grundfragt</td><td class="text-slate-400 text-xs">' + esc(r.fragtForklaring) + (r.antal > 1 ? ' × ' + r.antal + ' forsendelser' : '') + '</td><td class="num">' + fmt(r.grundfragtOrig) + ' ' + s.valutaFragt + '</td><td class="num">' + fmt(r.grundfragtDKK) + '</td></tr>';
@@ -1041,9 +1042,11 @@ function tegnResultat() {
   h += '</tfoot></table>';
   const ugyldig = valider();
   if (ugyldig.length) {
-    h = '<div class="border border-red-800 bg-red-950/30 rounded-xl p-3 mb-3 text-sm text-red-200">' +
-      '<div class="font-medium mb-1">Beregningen er ikke gyldig, før disse ting er rettet:</div>' +
-      '<ul class="list-disc pl-5 space-y-0.5">' + ugyldig.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' + h;
+    // Et negativt mål må ikke give et negativt rumfang på skærmen. Resultatet
+    // skjules, til inputtet er gyldigt.
+    h = '<div class="border border-red-800 bg-red-950/30 rounded-xl p-4 text-sm text-red-200">' +
+      '<div class="font-medium mb-1">Beregningen kan ikke vises, før dette er rettet:</div>' +
+      '<ul class="list-disc pl-5 space-y-0.5">' + ugyldig.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>';
   }
   $('#resultat').innerHTML = h;
   const gemKnap = $('#gemScenarie');
@@ -1078,7 +1081,10 @@ function tegnVurdering(r) {
   $('#noegletal').innerHTML =
     kpi('Pris pr. fragtpligtig kg',
       s.fragtType === 'fast' ? '&ndash;' : (r.fragtpligtig > 0 && r.total > 0 ? fmt(prKgFragt) + ' DKK' : 'Ikke beregnet'),
-      s.fragtType === 'fast' ? 'Fast pris, afregnes ikke pr. kg' : 'Total / afregnet vægt') +
+      s.fragtType === 'fast' ? 'Fast pris, afregnes ikke pr. kg'
+        : (r.valgt && !r.valgt.egen
+          ? 'Total ÷ ' + fmtKg(r.fragtpligtig) + ' kg fragtpligtig vægt. Fragten beregnes som ' + fmtKg(r.valgt.vaegt) + ' kg (break-point).'
+          : 'Total ÷ ' + fmtKg(r.fragtpligtig) + ' kg fragtpligtig vægt')) +
     kpi('Pris pr. faktisk kg', r.faktiskVaegt > 0 && r.total > 0 ? fmt(prKgFaktisk) + ' DKK' : 'Ikke beregnet',
       r.faktiskVaegt > 0 ? 'Det du reelt betaler pr. kg gods' : 'Vægten er ikke oplyst') +
     kpi(s.volumenErKapacitet ? 'Pris pr. m³ kapacitet' : 'Pris pr. m³', r.volumen > 0 && r.total > 0 ? fmt(prM3) + ' DKK' : 'Ikke beregnet',
@@ -1090,13 +1096,18 @@ function tegnVurdering(r) {
     kpi('CO2-udledning', num(s.afstand) > 0 ? fmt(r.co2, 1) + ' kg' : '&ndash;', num(s.afstand) > 0 ? '' : 'Udfyld afstand under E');
 
   // --- landed cost ---
+  const harVaerdi = r.vareVaerdi > 0;
+  const harTid = num(s.transportTid) > 0;
   let lc = '<table class="text-sm w-full min-w-[460px]"><tbody class="divide-y divide-[#1e2836]">';
-  lc += row('Vareværdi', fmt(r.vareVaerdi) + ' DKK');
+  lc += row('Vareværdi', harVaerdi ? fmt(r.vareVaerdi) + ' DKK' : '<span class="text-slate-500">Ikke oplyst</span>');
   lc += row('Fragtomkostning i alt', fmt(r.total) + ' DKK');
-  lc += row('Kapitalbinding under transport (' + fmt(num(s.transportTid), 0) + ' dage × ' + fmt(num(s.rente), 1) + ' % p.a.)', fmt(r.kapitalbinding) + ' DKK');
-  lc += '<tr class="bg-blue-950/30"><td class="font-medium">Landed cost i alt</td><td class="num font-bold text-blue-300">' + fmt(r.vareVaerdi + r.total + r.kapitalbinding) + ' DKK</td></tr>';
+  lc += row('Kapitalbinding under transport' + (harTid && harVaerdi ? ' (' + fmt(num(s.transportTid), 0) + ' dage × ' + fmt(num(s.rente), 1) + ' % p.a.)' : ''),
+    harTid && harVaerdi ? fmt(r.kapitalbinding) + ' DKK' : '<span class="text-slate-500">' + (!harVaerdi ? 'Kræver vareværdi' : 'Kræver transporttid') + '</span>');
+  lc += harVaerdi
+    ? '<tr class="bg-blue-950/30"><td class="font-medium">Landed cost i alt</td><td class="num font-bold text-blue-300">' + fmt(r.vareVaerdi + r.total + r.kapitalbinding) + ' DKK</td></tr>'
+    : '<tr><td colspan="2" class="text-xs text-slate-500 pt-2">Landed cost kan først beregnes, når vareværdien er udfyldt under punkt A.</td></tr>';
   lc += '</tbody></table>';
-  $('#landedCost').innerHTML = lc;
+  $('#landedCost').innerHTML = valider().length ? '' : lc;
 
   // --- kritiske kommentarer ---
   const k = [];
@@ -1284,9 +1295,9 @@ function tegnSammenlign() {
       '<td class="num text-slate-400">' + (b ? '&ndash;' : '+' + fmt(a.total - minPris)) + '</td>' +
       '<td class="num text-slate-400">' + fmt(a.kapital || 0) + '</td>' +
       '<td class="num">' + fmt(a.total + (a.kapital || 0)) + '</td>' +
-      '<td class="num">' + fmt(a.tid || 0, 0) + ' d</td>' +
-      '<td class="num">' + fmt(a.frekvens || 0, 0) + '</td>' +
-      '<td class="num">' + fmt(a.paalidelighed || 0, 0) + '</td>' +
+      '<td class="num">' + (num(a.tid) > 0 ? fmt(a.tid, 0) + ' d' : '&ndash;') + '</td>' +
+      '<td class="num">' + (num(a.frekvens) > 0 ? fmt(a.frekvens, 0) : '&ndash;') + '</td>' +
+      '<td class="num">' + (num(a.paalidelighed) > 0 && num(a.paalidelighed) !== 3 ? fmt(a.paalidelighed, 0) : '&ndash;') + '</td>' +
       '<td class="num">' + (a.co2 ? fmt(a.co2, 0) : '&ndash;') + '</td>' +
       '<td class="text-right whitespace-nowrap"><button class="hentSc text-blue-400 hover:text-blue-300 text-xs px-2" data-i="' + i + '">hent</button><button class="sletSc text-slate-500 hover:text-red-400 px-2" data-i="' + i + '" aria-label="Fjern ' + esc(a.navn) + '">✕</button></td></tr>';
   });
