@@ -96,7 +96,7 @@
     </p>
     <div class="flex flex-wrap gap-2">
       <button id="aiGenerer" class="text-sm bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg font-medium">Generér prompt fra case</button>
-      <span class="text-xs text-slate-500 self-center">Vælg først et delspørgsmål ovenfor, hvis casen har flere.</span>
+      <span id="aiGenererHint" class="text-xs text-slate-500 self-center">Upload eller indsæt casen først.</span>
     </div>
 
     <div id="aiPromptBoks" class="hidden mt-4">
@@ -4002,6 +4002,10 @@ function boerAnbefaleAi() {
 function tegnAiAnbefaling() {
   const kort = $('#aiKort'), intro = $('#aiIntro');
   if (!kort || !intro) return;
+  const harCase = !!String(aiFuldCaseTekst || samletTekst || '').trim();
+  const gen = $('#aiGenerer'), hint = $('#aiGenererHint');
+  if (gen) { gen.disabled = !harCase; gen.classList.toggle('opacity-40', !harCase); gen.classList.toggle('cursor-not-allowed', !harCase); }
+  if (hint) hint.textContent = harCase ? 'Vælg først et delspørgsmål ovenfor, hvis casen har flere.' : 'Upload eller indsæt casen først.';
   if (boerAnbefaleAi()) {
     kort.classList.add('border-blue-700');
     if (!$('#aiBanner')) {
@@ -4021,6 +4025,11 @@ function tegnAiAnbefaling() {
 function bindAi() {
   const g = $('#aiGenerer'); if (!g) return;
   g.addEventListener('click', function () {
+    if (!String(aiFuldCaseTekst || samletTekst || '').trim()) {
+      $('#aiPromptBoks').classList.add('hidden');
+      alert('Der er ingen case endnu. Upload casen eller indsæt teksten først. Prompten skal indeholde casens egen tekst, ellers har din AI intet at arbejde ud fra.');
+      return;
+    }
     $('#aiPrompt').value = byggAiPrompt();
     $('#aiPromptBoks').classList.remove('hidden');
     $('#aiKontrol').classList.add('hidden');
