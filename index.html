@@ -589,7 +589,8 @@ function tomState() {
     virksomhed: '', virksomhedKandidater: [],
     incoterm: '', incotermSted: '', incotermVersion: '',
     transportTid: 0, frekvens: 0, paalidelighed: 3, afstand: 0, co2Faktor: 500, rente: 8,
-    valutaer: [{ kode: 'USD', kurs: 6 }, { kode: 'EUR', kurs: 7.45 }]
+    valutaer: [{ kode: 'USD', kurs: 6 }, { kode: 'EUR', kurs: 7.45 }],
+    kontekst: null, vurdering: null
   };
 }
 
@@ -740,6 +741,12 @@ function incotermAfsnit(s) {
       ' Klausulen skal derfor kontrolleres mod casen, før leveringsbetingelsen kan bruges i vurderingen.';
   }
   if (!inc) {
+    const f = s.kontekst && s.kontekst.formaal;
+    if (f === 'private_move' || f === 'internal') {
+      return 'Der er ikke aftalt en Incoterms-klausul. Casen handler om ' + (f === 'private_move' ? 'en privat flytning' : 'en intern transport') +
+        ', hvor en handelsklausul ikke nødvendigvis er relevant. Det bør stadig aftales skriftligt, hvem der bærer risikoen og forsikringen på hver strækning, ' +
+        'og beregningen antager her, at samtlige poster afholdes af den, der bestiller transporten.';
+    }
     return 'Der er ikke oplyst nogen leveringsbetingelse. Det er en væsentlig mangel, for Incoterms afgør, ' +
       'hvem der betaler for- og eftertransport, terminalgebyrer, told og forsikring, og hvor risikoen går over. ' +
       'Beregningen forudsætter derfor, at samtlige poster er købers.';
@@ -1799,6 +1806,109 @@ function findRute(tekst) {
 //  Konklusionen skrives som sammenhaengende tekst, ikke som punkter,
 //  saa den kan bruges direkte i en besvarelse.
 // ------------------------------------------------------------
+function godsBeskrivelse(K) {
+  if (!K || !K.gods) return '';
+  const g = K.gods, flags = [];
+  if (g.tempF) flags.push('temperaturfølsomt');
+  if (g.farligt) flags.push('farligt gods');
+  if (g.skroebeligt) flags.push('skrøbeligt');
+  if (g.hoejVaerdi) flags.push('af høj værdi');
+  let t = '';
+  if (g.beskrivelse) t += 'Der transporteres ' + String(g.beskrivelse).replace(/\.$/, '') + '. ';
+  if (flags.length) t += 'Godset er ' + listeMedOg(flags) + ', og det stiller krav til, hvordan transporten udføres. ';
+  if ((g.krav || []).length) t += 'Casen fremhæver især ' + listeMedOg(g.krav) + '. ';
+  return t.trim();
+}
+function formaalBeskrivelse(K, virk) {
+  if (!K || !K.formaal) return '';
+  const v = virk || 'virksomheden';
+  if (K.formaal === 'trial') return 'Det er en prøveleverance. En fejl her er ekstra alvorlig, fordi den kan spærre for et fremtidigt samarbejde, så leveringssikkerhed vejer tungt.';
+  if (K.formaal === 'recurring') return 'Det er en fast eller tilbagevendende transport, så en løsning, der fungerer stabilt over tid, betyder mere end en enkelt lav pris.';
+  if (K.formaal === 'private_move') return 'Det er en privat flytning, hvor ansvar, forsikring og forsvarlig pakning betyder mere end de sidste kroner på fragten.';
+  if (K.formaal === 'internal') return 'Det er en intern transport, så vurderingen handler om ' + v + 's egne omkostninger og risiko, ikke om en handelsaftale.';
+  if (K.formaal === 'one_time') return 'Det er en enkeltordre.';
+  return '';
+}
+function kundeBeskrivelse(K) {
+  if (!K || !K.kundeNiveau || K.kundeNiveau === 'low') return '';
+  if (K.kundeNiveau === 'high') return 'Kunden eller markedet har stor betydning, og en forsinket eller forringet leverance kan koste mere end prisforskellen mellem tilbuddene.';
+  return 'Kunden har en vis betydning, og leveringssikkerheden bør indgå i valget.';
+}
+function beslutningsAfsnitEnkelt(s, virk, af) {
+  if (s.kontekst) {
+    const dcp = [godsBeskrivelse(s.kontekst), formaalBeskrivelse(s.kontekst, virk), kundeBeskrivelse(s.kontekst)].filter(Boolean).join(' ');
+    if (dcp) af.push(dcp);
+  }
+  const V = s.vurdering;
+  if (V) {
+    const dele = [];
+    if ((V.risici || []).length) dele.push('risici: ' + listeMedOg(V.risici));
+    if ((V.betingelser || []).length) dele.push('betingelser: ' + listeMedOg(V.betingelser));
+    if ((V.udeladte || []).length) dele.push('prisen dækker ikke ' + listeMedOg(V.udeladte));
+    if (V.prisstatus === 'partial' || V.prisstatus === 'conditional') dele.push('prisen er ' + (V.prisstatus === 'partial' ? 'delvis' : 'betinget') + ' og skal gøres færdig, før den kan bruges som facit');
+    if (V.opfylderKrav === 'no') dele.push('løsningen opfylder efter casen ikke de nødvendige krav');
+    if (V.opfylderKrav === 'unknown') dele.push('det er ikke dokumenteret, at løsningen opfylder alle krav');
+    if (dele.length) af.push('Til vurderingen af netop denne løsning hører også. ' + dele.map(x => x.charAt(0).toUpperCase() + x.slice(1)).join('. ') + '.');
+  }
+}
+function konklusionAnbefaling(arr, billigst, rest, virk, kort) {
+  const af = [];
+  const K = billigst.state.kontekst;
+  const vOf = x => (x.state && x.state.vurdering) || null;
+  const opfylder = x => { const v = vOf(x); return v ? v.opfylderKrav : ''; };
+  const prisstatus = x => { const v = vOf(x); return v ? v.prisstatus : ''; };
+  const udeladte = x => { const v = vOf(x); return (v && v.udeladte) || []; };
+
+  let anbefalet = billigst, gateGrund = '';
+  const kravListe = (K && K.krav) ? K.krav.map(k => k.krav) : [];
+  if (kravListe.length || arr.some(x => opfylder(x))) {
+    if (opfylder(billigst) === 'no') {
+      const ok = arr.filter(x => opfylder(x) === 'yes').sort((a, b) => a.total - b.total);
+      if (ok.length) {
+        anbefalet = ok[0];
+        gateGrund = kort(billigst.navn) + ' er billigst, men opfylder efter casen ikke de krav, transporten stiller' +
+          (kravListe.length ? ' (' + listeMedOg(kravListe) + ')' : '') + ', og kan derfor ikke anbefales som den er.';
+      } else {
+        gateGrund = kort(billigst.navn) + ' er billigst, men opfylder efter casen ikke de nødvendige krav, og ingen af de øvrige muligheder er dokumenteret at opfylde dem. Der kan derfor ikke gives en sikker anbefaling, før det er afklaret.';
+      }
+    }
+  }
+
+  const ledSaet = arr.map(x => { const v = vOf(x); return v && (v.led || []).length ? v.led.join(' | ') : ''; }).filter(Boolean);
+  const ikkeSammenlignelig = arr.some(x => prisstatus(x) === 'partial' || prisstatus(x) === 'conditional') ||
+    arr.some(x => udeladte(x).length) || (ledSaet.length > 1 && new Set(ledSaet).size > 1);
+
+  const va = vOf(anbefalet), forbehold = [];
+  if (va) {
+    (va.betingelser || []).forEach(b => forbehold.push(String(b).replace(/.$/, '')));
+    if ((va.udeladte || []).length) forbehold.push('prisen ikke dækker ' + listeMedOg(va.udeladte));
+    if (opfylder(anbefalet) === 'unknown') forbehold.push('det bliver dokumenteret, at ' + kort(anbefalet.navn) + ' opfylder alle krav');
+  }
+  const citatA = casecitat(anbefalet.prosa);
+  if (citatA && /no guarantee|ingen garanti|prolonged|forl(?:æ|ae)nget|delay|forsink|vary|varier/i.test(citatA)) forbehold.push('casens eget forbehold accepteres: «' + citatA + '»');
+
+  let t;
+  if (gateGrund) {
+    t = gateGrund + ' ';
+    if (anbefalet !== billigst) t += (virk ? 'Jeg vil i stedet anbefale ' + virk + ' at vælge ' : 'I stedet anbefales ') + kort(anbefalet.navn) + ' til ' + fmt(anbefalet.total) + ' DKK, som efter casen opfylder kravene. ';
+  } else {
+    t = (virk ? 'Samlet set vil jeg anbefale ' + virk + ' at vælge ' : 'Samlet set anbefales ') + kort(anbefalet.navn) + ' til ' + fmt(anbefalet.total) + ' DKK. ';
+  }
+  if (ikkeSammenlignelig) t += 'Det er den laveste samlede pris ud fra casens oplysninger, men tilbuddene dækker ikke helt samme strækning og ydelser, så tallene er ikke fuldt sammenlignelige. ';
+  af.push(t.trim());
+
+  af.push(forbehold.length
+    ? 'Anbefalingen forudsætter, at ' + listeMedOg(forbehold) + '.'
+    : 'Der er ikke i casen fundet forbehold, der taler imod ' + kort(anbefalet.navn) + '.');
+
+  const gemtF = state;
+  state = JSON.parse(JSON.stringify(anbefalet.state));
+  const forud = forudsaetninger(state, beregn());
+  state = gemtF;
+  if (forud.length) af.push('Beregningen bygger på disse forudsætninger. ' + forud.map(x => x.charAt(0).toUpperCase() + x.slice(1) + '.').join(' '));
+  return af;
+}
+
 function prosaEnkelt(r, navn) {
   const s = state, af = [];
   const rute = findRute(samletTekst);
@@ -1910,6 +2020,7 @@ function prosaEnkelt(r, navn) {
     }
     af.push(p5);
   }
+  beslutningsAfsnitEnkelt(s, virk, af);
   const forud = forudsaetninger(s, r);
   if (forud.length) af.push('Beregningen bygger på disse forudsætninger. ' + forud.map(x => x.charAt(0).toUpperCase() + x.slice(1) + '.').join(' '));
   return af;
@@ -2011,22 +2122,32 @@ function prosaFlere(arr, billigst, rest, dyrest, kort) {
     : 'Der er ingen forsikring med i beregningen, og transportørens ansvar er beløbsbegrænset, så forsikringen bør vurderes særskilt.';
   af.push('Valget bør ikke træffes på pris alene. ' + p5);
 
-  let p6 = virk
-    ? 'Samlet set vil jeg anbefale ' + virk + ' at vælge ' + kort(billigst.navn) + ' til ' + fmt(billigst.total) + ' DKK. '
-    : 'Samlet set anbefales ' + kort(billigst.navn) + ' til ' + fmt(billigst.total) + ' DKK. ';
-  if (forbehold && citatB) {
-    p6 += 'Der er dog taget forbehold for netop denne løsning: «' + citatB + '» Kan den usikkerhed ikke accepteres, ' +
-      'koster den næstbilligste ' + fmt(rest[0].total - billigst.total) + ' DKK mere for større sikkerhed.';
-  } else {
-    p6 += 'Den tekst, der er læst ind fra casen, tager ikke forbehold for den løsning.';
+  const K = billigst.state.kontekst;
+  if (K || arr.some(x => x.state && x.state.vurdering)) {
+    const dcp = [godsBeskrivelse(K), formaalBeskrivelse(K, virk), kundeBeskrivelse(K)].filter(Boolean).join(' ');
+    if (dcp) af.push(dcp);
+    const kravListe = (K && K.krav) ? K.krav.map(x => x.krav) : [];
+    if (kravListe.length) {
+      const status = arr.map(x => {
+        const v = x.state && x.state.vurdering;
+        const o = v ? v.opfylderKrav : '';
+        return kort(x.navn) + ' ' + (o === 'yes' ? 'opfylder kravene' : o === 'no' ? 'opfylder dem ikke' : 'er ikke dokumenteret at opfylde dem');
+      });
+      af.push('Casen stiller ufravigelige krav: ' + listeMedOg(kravListe) + '. ' + listeMedOg(status) + '.');
+    }
+    const risikoDele = arr.map(x => {
+      const v = x.state && x.state.vurdering;
+      return v && (v.risici || []).length ? 'for ' + kort(x.navn) + ': ' + listeMedOg(v.risici) : '';
+    }).filter(Boolean);
+    if (risikoDele.length) af.push('Casen peger på disse risici. ' + risikoDele.map(x => x.charAt(0).toUpperCase() + x.slice(1)).join('. ') + '.');
+    const kapDele = arr.map(x => {
+      const v = x.state && x.state.vurdering;
+      return v && (v.kapacitet || []).length ? kort(x.navn) + ' dokumenterer ' + listeMedOg(v.kapacitet) : '';
+    }).filter(Boolean);
+    if (kapDele.length) af.push(listeMedOg(kapDele) + '.');
   }
-  af.push(p6);
-  // forudsaetningerne for den anbefalede loesning
-  const gemtF = state;
-  state = JSON.parse(JSON.stringify(billigst.state));
-  const forud = forudsaetninger(state, beregn());
-  state = gemtF;
-  if (forud.length) af.push('Anbefalingen bygger på disse forudsætninger. ' + forud.map(x => x.charAt(0).toUpperCase() + x.slice(1) + '.').join(' '));
+
+  af.push.apply(af, konklusionAnbefaling(arr, billigst, rest, virk, kort));
   return af;
 }
 
@@ -3195,6 +3316,31 @@ function byggStateFraFund(valgte, navn, grund) {
     }
   });
 
+  const kx = valgte.filter(f => f.type === 'kontekst');
+  if (kx.length) {
+    const k = { formaal: '', formaalCitat: '', kundeNiveau: '', kundeCitat: '', gods: null, frist: null, krav: [] };
+    kx.forEach(f => {
+      const d = f.data;
+      if (d.felt === 'formaal') { k.formaal = d.vaerdi; k.formaalCitat = f.kilde || ''; }
+      else if (d.felt === 'kunde') { k.kundeNiveau = d.niveau; k.kundeCitat = f.kilde || ''; }
+      else if (d.felt === 'gods') { k.gods = { beskrivelse: d.beskrivelse, tempF: d.tempF, farligt: d.farligt, skroebeligt: d.skroebeligt, hoejVaerdi: d.hoejVaerdi, krav: d.krav || [], citat: f.kilde || '' }; }
+      else if (d.felt === 'frist') { k.frist = { kraevet: d.kraevet, beskrivelse: d.beskrivelse, citat: f.kilde || '' }; }
+      else if (d.felt === 'krav') { k.krav.push({ krav: d.krav, grund: d.grund, citat: f.kilde || '' }); }
+    });
+    s.kontekst = k;
+  }
+  const vu = valgte.filter(f => f.type === 'vurdering');
+  if (vu.length) {
+    const V = { led: [], udeladte: [], betingelser: [], kapacitet: [], risici: [], opfylderKrav: '', prisstatus: '' };
+    vu.forEach(f => {
+      const d = f.data;
+      if (d.felt === 'opfylderKrav') V.opfylderKrav = d.vaerdi;
+      else if (d.felt === 'prisstatus') V.prisstatus = d.vaerdi;
+      else if (Array.isArray(V[d.felt])) V[d.felt] = V[d.felt].concat(d.liste || []);
+    });
+    s.vurdering = V;
+  }
+
   const brugte = [s.valutaFragt].concat(s.linjer.filter(l => l.type !== 'pct').map(l => l.valuta));
   brugte.forEach(k => {
     if (!k || k === 'DKK') return;
@@ -3360,6 +3506,13 @@ function byggAiPrompt() {
     '  "selected_question": "string eller null",',
     '  "company": { "value": "string eller null", "source_quote": "string eller null" },',
     '  "exchange_rates": [ { "currency": "USD", "dkk_per_unit": 6.0, "source_quote": "..." } ],',
+    '  "decision_context": {',
+    '    "shipment_purpose": "trial | one_time | recurring | internal | private_move | unknown",',
+    '    "customer_importance": { "level": "low | medium | high | unknown", "source_quote": null },',
+    '    "goods": { "description": null, "temperature_sensitive": null, "dangerous_goods": null, "fragile": null, "high_value": null, "requirements": [], "source_quote": null },',
+    '    "deadline": { "required": null, "description": null, "source_quote": null },',
+    '    "mandatory_requirements": [ { "requirement": "...", "reason": "...", "source_quote": "..." } ]',
+    '  },',
     '  "transport_options": [',
     '    {',
     '      "name": "kort navn på muligheden",',
@@ -3369,12 +3522,16 @@ function byggAiPrompt() {
     '      "total_weight_kg": { "value": 320, "source_quote": "...", "formula": null },',
     '      "volume_m3": { "value": null, "source_quote": null, "formula": null },',
     '      "base_freight": { "type": "tiered | per_wm | flat | per_kg | flat_per_unit", "currency": "EUR", "tiers": [ { "from_kg": 100, "rate": 5.11 } ], "rate": null, "quantity": null, "unit": null, "min_charge": null, "formula": null, "source_quote": "..." },',
-    '      "surcharges": [ { "name": "CAF", "type": "percent_of_base | flat | per_kg | per_wm | per_100kg | per_m3", "amount": 6, "currency": null, "source_quote": "..." } ],',
+    '      "surcharges": [ { "name": "CAF", "type": "percent_of_base | flat | per_kg | per_wm | per_100kg | per_m3 | flat_per_unit", "amount": 6, "quantity": null, "unit": null, "currency": null, "source_quote": "..." } ],',
     '      "goods_value_dkk": { "value": null, "source_quote": null, "formula": null },',
     '      "insurance_percent": { "value": null, "base": "value | value_plus_freight", "source_quote": null },',
     '      "transport_time_days": { "value": null, "source_quote": null },',
     '      "derived_values": [ { "name": "gross_weight_kg", "value": 456, "formula": "300 + 3 x 52" } ],',
-    '      "missing_information": [ "hvad casen ikke oplyser" ]',
+    '      "missing_information": [ "hvad casen ikke oplyser" ],',
+    '      "assessment": {',
+    '        "included_legs": [], "excluded_costs": [], "conditions": [], "documented_capabilities": [], "risks": [],',
+    '        "meets_mandatory_requirements": "yes | no | unknown", "price_status": "complete | partial | conditional"',
+    '      }',
     '    }',
     '  ]',
     '}'
@@ -3397,9 +3554,13 @@ function byggAiPrompt() {
     '5. For hver vigtig værdi: medtag et ordret source_quote fra casen (kopiér teksten præcis). Findes citatet ikke i teksten, må værdien ikke medtages.',
     '6. Udledte værdier skal have en synlig formel i "formula", fx "300 + 3 x 52", og formlen må kun bruge tal fra casen.',
     '6b. Er fragten en pris pr. enhed (fx pr. container), brug type "flat_per_unit" med "quantity", "rate", "unit" og "formula" som "2 x 9500".',
+    '6c. Er et gebyr en pris pr. transport eller enhed uden oplyst antal, brug surcharge-type "flat_per_unit" med "quantity": null. Så ved FragtAnalyse, at totalen ikke kan gøres færdig.',
     '7. Du må gerne kontrollere dine egne udregninger, men FragtAnalyse udfører det endelige regnestykke. Medtag ikke en samlet pris.',
     '8. Returnér KUN gyldig JSON i formatet nedenfor. Ingen forklarende tekst, ingen markdown.',
     '9. Svaret skal begynde med "schema_version": "' + AI_SCHEMA_VERSION + '".',
+    '10. Udfyld "decision_context" og hver muligheds "assessment" ud fra casen. Hvert tekstpunkt skal kunne genfindes i casen. Kan et punkt ikke belægges, så udelad det.',
+    '11. Er en pris kun delvis (mangler et transportled eller et gebyr), sæt "price_status" til "partial" eller "conditional" og skriv det manglende i "excluded_costs".',
+    '12. "meets_mandatory_requirements" må kun være "yes", hvis casen dokumenterer, at muligheden opfylder alle krav i "mandatory_requirements". Ellers "no" eller "unknown".',
     '',
     (valgt ? 'VALGT DELSPØRGSMÅL (fokusér kun på dette)\n' + valgt + '\n\n' + aiValgtDelspoergsmaalTekst() + '\n' : ''),
     'HELE CASETEKSTEN (brug også afsnit tidligere i teksten til fælles mål, vægt, kurs og virksomhed)',
@@ -3501,7 +3662,7 @@ function validerAiSvar(data) {
     if (o.import && o.afsnit != null) o.import.afsnit = o.afsnit;
     raekker.push({ gruppe: gruppe, navn: navn, vaerdi: vaerdi, status: status,
       citat: o.citat || '', formel: o.formel || '', note: o.note || ekstraNote || '',
-      import: o.import || null, valgt: status === 'groen' });
+      import: o.import || null, valgt: status === 'groen' || (status !== 'roed' && status !== 'graa' && !!o.forvalgt) });
   }
 
   // fælles: virksomhed, kurser
@@ -3512,6 +3673,40 @@ function validerAiSvar(data) {
     felt('Fælles', 'Valutakurs 1 ' + kode, isFinite(kurs) && kurs > 0 ? kurs + ' DKK' : null,
       { citat: k.source_quote, roed: kode && VALID_CUR.indexOf(kode) < 0 || (kode && !(kurs > 0)),
         import: { type: 'kurs', valuta: kode, kurs: kurs } });
+  });
+
+  const dc = data.decision_context || {};
+  if (dc.shipment_purpose && dc.shipment_purpose !== 'unknown') {
+    const FORM = { trial: 'Prøveleverance', one_time: 'Enkeltordre', recurring: 'Fast eller tilbagevendende transport', internal: 'Intern transport', private_move: 'Privat flytning' };
+    felt('Beslutningsgrundlag', 'Formål med transporten', FORM[dc.shipment_purpose] || dc.shipment_purpose,
+      { forvalgt: true, import: { type: 'kontekst', felt: 'formaal', vaerdi: dc.shipment_purpose } });
+  }
+  if (dc.customer_importance && dc.customer_importance.level && dc.customer_importance.level !== 'unknown') {
+    const NIV = { low: 'Lav', medium: 'Middel', high: 'Høj' };
+    felt('Beslutningsgrundlag', 'Kundens eller markedets betydning', NIV[dc.customer_importance.level] || dc.customer_importance.level,
+      { citat: dc.customer_importance.source_quote, forvalgt: true, import: { type: 'kontekst', felt: 'kunde', niveau: dc.customer_importance.level } });
+  }
+  if (dc.goods) {
+    const gg = dc.goods, flags = [];
+    if (gg.temperature_sensitive) flags.push('temperaturfølsomt');
+    if (gg.dangerous_goods) flags.push('farligt gods');
+    if (gg.fragile) flags.push('skrøbeligt');
+    if (gg.high_value) flags.push('høj værdi');
+    const krav = (gg.requirements || []).map(String).map(function (x) { return x.trim(); }).filter(Boolean);
+    if (gg.description || flags.length || krav.length) {
+      felt('Beslutningsgrundlag', 'Godsets art', (gg.description || 'Ikke nærmere beskrevet') + (flags.length ? ' — ' + flags.join(', ') : '') + (krav.length ? '. Krav: ' + krav.join(', ') : ''),
+        { citat: gg.source_quote, forvalgt: true,
+          import: { type: 'kontekst', felt: 'gods', beskrivelse: gg.description || '', tempF: !!gg.temperature_sensitive, farligt: !!gg.dangerous_goods, skroebeligt: !!gg.fragile, hoejVaerdi: !!gg.high_value, krav: krav } });
+    }
+  }
+  if (dc.deadline && (dc.deadline.required || dc.deadline.description)) {
+    felt('Beslutningsgrundlag', 'Leveringsfrist', dc.deadline.description || (dc.deadline.required ? 'Der er en frist, men den er ikke beskrevet nærmere' : 'Ingen fast frist'),
+      { citat: dc.deadline.source_quote, forvalgt: true, import: { type: 'kontekst', felt: 'frist', kraevet: !!dc.deadline.required, beskrivelse: dc.deadline.description || '' } });
+  }
+  (dc.mandatory_requirements || []).forEach(function (mr) {
+    if (!mr || !mr.requirement) return;
+    felt('Beslutningsgrundlag', 'Ufravigeligt krav: ' + String(mr.requirement), String(mr.reason || 'Krav fra casen'),
+      { citat: mr.source_quote, forvalgt: true, import: { type: 'kontekst', felt: 'krav', krav: String(mr.requirement), grund: String(mr.reason || '') } });
   });
 
   data.transport_options.forEach(function (opt, oi) {
@@ -3587,6 +3782,21 @@ function validerAiSvar(data) {
     // tillæg
     const SUR_MAP = { percent_of_base: 'pct', flat: 'fast', per_kg: 'kg', per_wm: 'wm', per_100kg: 'kg100', per_m3: 'm3' };
     (opt.surcharges || []).forEach(function (su) {
+      if (String(su.type || '').toLowerCase() === 'flat_per_unit') {
+        const rate = Number(su.amount), q = su.quantity == null ? null : Number(su.quantity);
+        const cur2 = String(su.currency || '').toUpperCase();
+        if (q == null || !(q > 0)) {
+          raekker.push({ gruppe: g, navn: su.name || 'Gebyr pr. enhed', vaerdi: (rate > 0 ? rate + ' ' + (cur2 || 'DKK') : '?') + ' pr. ' + (su.unit || 'enhed') + ' — antal ikke oplyst',
+            status: 'gul', citat: su.source_quote || '', formel: '', note: 'Antallet er ikke oplyst i casen, så dette gebyr kan ikke lægges ind. Prisen bliver derfor delvis.',
+            import: null, valgt: false });
+        } else {
+          felt(g, su.name || 'Gebyr pr. enhed', q + ' × ' + rate + ' ' + (cur2 || 'DKK') + ' = ' + fmt(q * rate) + ' ' + (cur2 || 'DKK'),
+            { citat: su.source_quote, formel: (su.formula || (q + ' x ' + rate)),
+              roed: (su.amount != null && !(rate > 0)) || (cur2 && VALID_CUR.indexOf(cur2) < 0),
+              import: { type: 'linje', navn: su.name || 'Gebyr pr. enhed', linjetype: 'fast', sats: q * rate, valuta: cur2 || 'DKK', pctRefs: [] }, afsnit: oi });
+        }
+        return;
+      }
       const a = Number(su.amount);
       const styp = SUR_MAP[String(su.type || '').toLowerCase()];
       const cur = String(su.currency || '').toUpperCase();
@@ -3634,6 +3844,29 @@ function validerAiSvar(data) {
     (opt.missing_information || []).forEach(function (mi) {
       raekker.push({ gruppe: g, navn: 'Mangler ifølge AI', vaerdi: String(mi), status: 'graa', citat: '', formel: '', note: '', import: null, valgt: false });
     });
+
+    // vurdering af muligheden (til konklusionen, ikke til prisen)
+    const asx = opt.assessment || {};
+    function vfelt(navn, arr, key) {
+      const liste = (arr || []).map(String).map(function (x) { return x.trim(); }).filter(Boolean);
+      if (!liste.length) return;
+      felt(g, navn, liste.join('; '), { forvalgt: true, import: { type: 'vurdering', felt: key, liste: liste }, afsnit: oi });
+    }
+    vfelt('Dækkede transportled', asx.included_legs, 'led');
+    vfelt('Udeladte omkostninger', asx.excluded_costs, 'udeladte');
+    vfelt('Betingelser for tilbuddet', asx.conditions, 'betingelser');
+    vfelt('Dokumenteret kapacitet', asx.documented_capabilities, 'kapacitet');
+    vfelt('Risici', asx.risks, 'risici');
+    if (['yes', 'no', 'unknown'].indexOf(asx.meets_mandatory_requirements) >= 0) {
+      const MM = { yes: 'Ja', no: 'Nej', unknown: 'Uvist' };
+      felt(g, 'Opfylder casens ufravigelige krav', MM[asx.meets_mandatory_requirements],
+        { forvalgt: true, import: { type: 'vurdering', felt: 'opfylderKrav', vaerdi: asx.meets_mandatory_requirements }, afsnit: oi });
+    }
+    if (['complete', 'partial', 'conditional'].indexOf(asx.price_status) >= 0) {
+      const PS = { complete: 'Fuldstændig', partial: 'Delvis', conditional: 'Betinget' };
+      felt(g, 'Prisens dækning', PS[asx.price_status],
+        { forvalgt: true, import: { type: 'vurdering', felt: 'prisstatus', vaerdi: asx.price_status }, afsnit: oi });
+    }
   });
 
   return raekker;
@@ -3684,6 +3917,8 @@ function aiOverfoer(raekker) {
       case 'minFragt': f.type = 'minFragt'; f.label = 'Minimumssats M'; f.data = { min: d.min, valuta: d.valuta }; break;
       case 'vareVaerdi': f.type = 'vareVaerdi'; f.label = 'Vareværdi i alt'; f.data = { vaerdi: d.vaerdi }; break;
       case 'tid': f.type = 'tid'; f.label = 'Transporttid'; f.data = { dage: d.dage }; break;
+      case 'kontekst': f.type = 'kontekst'; f.label = 'Beslutningsgrundlag'; f.data = d; break;
+      case 'vurdering': f.type = 'vurdering'; f.label = 'Vurdering af mulighed'; f.data = d; break;
       case 'linje':
         f.type = 'linje'; f.label = d.navn;
         f.data = { navn: d.navn, type: d.linjetype, valuta: d.valuta, sats: d.sats, sats2: 0, min: 0, pctRefs: d.pctRefs || [] };
@@ -4044,6 +4279,7 @@ function bind() {
       'Uploadede filer, fundne værdier' + (antalMul ? ' og ' + antalMul + ' beregnede muligheder' : '') +
       ' bliver ryddet. Gemte cases bliver liggende.')) return;
     fund = []; afsnitListe = []; samletTekst = ''; aiFuldCaseTekst = ''; opdelingTilstand = 'auto'; aktivCase = '';
+    state.kontekst = null; state.vurdering = null;
     delspoergsmaalTekster = []; valgtDelspoergsmaal = -1; delspoergsmaalPraeamb = '';
     aiRaekker = []; if ($('#aiKontrol')) { $('#aiKontrol').innerHTML = ''; $('#aiKontrol').classList.add('hidden'); }
     if ($('#aiPromptBoks')) $('#aiPromptBoks').classList.add('hidden');
