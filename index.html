@@ -434,7 +434,7 @@
   </div>
   <div id="vtool-trailer" class="card p-4 vtoolpanel hidden">
     <h2 class="font-semibold mb-1">Lastbil- &amp; trailerkapacitet</h2>
-    <p class="text-xs text-slate-400 mb-3">Om godset er inden for køretøjets vægt- og volumenkapacitet. Vejledende &mdash; tager ikke højde for akseltryk, vægtfordeling m.m.</p>
+    <p class="text-xs text-slate-400 mb-3">Om godset er inden for køretøjets vægt- og volumenkapacitet. Vejledende &mdash; tager ikke højde for akseltryk, vægtfordeling m.m. 44.000 kg er kun ét eksempel på en dansk totalvægt &mdash; det rigtige tal afhænger af antal aksler og afstanden mellem dem (fra 28.000 til 56.000 kg, se tabellen under Teori). Tjek din konkrete køretøjskombinations registreringsattest.</p>
     <div class="flex flex-wrap gap-4 items-end mb-3">
       <div><div class="text-xs text-slate-400 mb-1">Trailertype</div>
         <select id="vtTrType" class="text-sm">
@@ -542,6 +542,105 @@
   </div>
 
   <div class="card p-4">
+    <h2 class="font-semibold mb-2">Ansvar pr. transportform</h2>
+    <p class="text-sm text-slate-300 mb-3">Bliver godset skadet eller bortkommet undervejs, er transportørens ansvar som udgangspunkt begrænset til et fast beløb pr. kg &mdash; ikke varens fulde værdi. Beløbet måles i SDR (Special Drawing Rights, en IMF-valutaenhed på ca. 8&ndash;9 DKK &mdash; slå den aktuelle kurs op). Det er ikke det samme som Incoterms: Incoterms afgør <i>hvem</i> der bærer risikoen og hvorfra/hvortil, ansvarskonventionen afgør <i>hvor meget</i> transportøren skal betale, hvis noget går galt. De skal læses sammen.</p>
+    <div class="scroll"><table class="text-sm w-full min-w-[480px]">
+      <thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Transportform</th><th class="text-left">Konvention</th><th class="text-right">Ansvarsgrænse</th><th class="text-right">Reklamationsfrist</th></tr></thead>
+      <tbody class="divide-y divide-[#1e2836]">
+        <tr><td>Vej</td><td>CMR-konventionen</td><td class="num">8,33 SDR/kg</td><td class="num">1 år</td></tr>
+        <tr><td>Sø</td><td>Hague-Visby-reglerne</td><td class="num">666,67 SDR/kolli eller 2 SDR/kg</td><td class="num">1 år</td></tr>
+        <tr><td>Luft</td><td>Montreal-konventionen (1999)</td><td class="num">ca. 26 SDR/kg</td><td class="num">2 år</td></tr>
+        <tr><td>Bane</td><td>CIM/COTIF-konventionen</td><td class="num">17 SDR/kg</td><td class="num">1 år</td></tr>
+      </tbody>
+    </table></div>
+    <p class="text-xs text-slate-400 mt-3">Luftfragt har både den højeste dækning pr. kg og den længste reklamationsfrist. Ved søfragt afgør angivelsen på konnossementet meget &mdash; én container som "1 kolli" giver en helt anden ansvarsgrænse end mange kartoner enkeltvis. Transportøren går fri ved fejl i varens egen beskaffenhed, mangelfuld emballering fra afsender, eller force majeure. Høj værdi kombineret med lav vægt (fx elektronik, medicin) er typisk stærkt underdækket af ansvarsgrænsen &mdash; det er her, vareforsikring skal dække resten.</p>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="font-semibold mb-2">Aktører og certificeringer på transportmarkedet</h2>
+    <p class="text-sm text-slate-300 mb-2">Hvem gør hvad, fra afsender til modtager:</p>
+    <ul class="text-sm text-slate-300 list-disc pl-5 space-y-1 mb-3">
+      <li><span class="text-blue-300">Afsender/modtager.</span> Ejer godset.</li>
+      <li><span class="text-blue-300">Transportør</span> (vognmand, rederi, flyselskab, bane). Flytter godset med eget materiel.</li>
+      <li><span class="text-blue-300">Speditør.</span> Arrangerer transporten på afsenders vegne, samler gods og laver dokumenter.</li>
+      <li><span class="text-blue-300">Agent/NVOCC.</span> Repræsenterer en linje eller udsteder egne konnossementer.</li>
+      <li><span class="text-blue-300">3PL/4PL.</span> En outsourcet logistikoperatør (3PL) eller en netværks-orkestrator, der styrer flere 3PL'er (4PL).</li>
+      <li><span class="text-blue-300">Toldklarerer og terminal.</span> Klarering og håndtering ved modeskift, fx havn eller jernbaneterminal.</li>
+    </ul>
+    <p class="text-sm text-slate-300 mb-2">Digitale værktøjer man støder på: TMS (Transport Management System), WMS (Warehouse Management System), track &amp; trace/telematik, EDI og port community-systemer, samt fragtbørser til spotkapacitet.</p>
+    <p class="text-sm text-slate-300 mb-2">En certificering er en uafhængig revision mod en offentliggjort standard &mdash; ofte en betingelse for overhovedet at komme i betragtning som leverandør ("order qualifier"), ikke det der vinder ordren. Match certificeringen til godset:</p>
+    <ul class="text-sm text-slate-300 list-disc pl-5 space-y-1">
+      <li><span class="text-blue-300">Told/sikkerhed.</span> AEO (EU) / C-TPAT (USA) for en betroet operatør. ISO 28000 (sikkerhedsledelse i forsyningskæden). TAPA FSR (lager) / TSR (vejtransport) for højværdigods. ISPS er obligatorisk for skibe og havne.</li>
+      <li><span class="text-blue-300">Farligt gods.</span> ADR (vej, kræver ADR-bevis og sikkerhedsrådgiver), IMDG-koden (sø), IATA DGR (luft).</li>
+      <li><span class="text-blue-300">Branchespecifik.</span> GDP (pharma/koldkæde), SQAS (kemi), ATP + HACCP (fødevarer/temperaturstyring), IATA CEIV (pharma, fersk, lithium-batterier).</li>
+    </ul>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="font-semibold mb-2">Luftens ni friheder</h2>
+    <p class="text-sm text-slate-300 mb-3">Kommercielle luftfartsrettigheder aftalt mellem lande, som bestemmer hvilke ruter og hvilken trafik et lands flyselskaber må operere til, fra og gennem andre landes luftrum. De første fem er de mest almindelige og har direkte betydning for, hvilke selskaber der kan tilbyde luftfragtruter mellem to lande.</p>
+    <ol class="text-sm text-slate-300 list-decimal pl-5 space-y-1">
+      <li>Overflyve et andet lands territorium uden at lande, på vej til et tredje land.</li>
+      <li>Mellemlande af ikke-trafikale årsager (fx tankning), uden at laste/losse.</li>
+      <li>Transportere fra eget hjemland til et andet land.</li>
+      <li>Transportere fra et andet land tilbage til eget hjemland (gives normalt sammen med 3.).</li>
+      <li>Transportere mellem to fremmede lande, som del af en rute der starter/slutter i eget hjemland.</li>
+      <li>Transportere mellem to fremmede lande via eget hjemland som hub.</li>
+      <li>Operere en rute helt mellem to fremmede lande uden at røre eget hjemland.</li>
+      <li>Cabotage, del 1: mellem to punkter i et fremmed land, som forlængelse af en rute til/fra eget hjemland.</li>
+      <li>Ren cabotage: udelukkende mellem to punkter i et fremmed land, uden forbindelse til eget hjemland.</li>
+    </ol>
+    <p class="text-xs text-slate-400 mt-3">De sidste fire (6&ndash;9), især cabotage (8&ndash;9), er langt mere politisk følsomme og sjældnere tildelt &mdash; de giver udenlandske selskaber adgang til at konkurrere om indenrigstrafik, som de fleste lande beskytter for egne nationale selskaber.</p>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="font-semibold mb-2">Danske total- og vogntogsvægte</h2>
+    <p class="text-sm text-slate-300 mb-3">Der findes ikke ét dansk vægtmaksimum for lastbiler &mdash; grænsen afhænger af antal aksler og afstanden mellem dem. 44.000 kg (brugt som standard i Trailerkapacitet-værktøjet) er ét almindeligt eksempel, ikke loftet.</p>
+    <div class="scroll"><table class="text-sm w-full min-w-[420px]">
+      <thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Vogntog</th><th class="text-right">Tilladt totalvægt</th></tr></thead>
+      <tbody class="divide-y divide-[#1e2836]">
+        <tr><td>3 aksler</td><td class="num">28.000 kg</td></tr>
+        <tr><td>4 aksler</td><td class="num">32.000&ndash;38.000 kg</td></tr>
+        <tr><td>5 aksler</td><td class="num">42.000&ndash;44.000 kg</td></tr>
+        <tr><td>6 aksler</td><td class="num">45.000&ndash;50.000 kg</td></tr>
+        <tr><td>7 aksler</td><td class="num">54.000&ndash;56.000 kg</td></tr>
+      </tbody>
+    </table></div>
+    <p class="text-xs text-slate-400 mt-2">Præcise grænser kræver mindste-afstande mellem akslerne (typisk 1,3&ndash;4 m afhængigt af konfiguration) &mdash; se ITD's vægtark for alle kombinationer. Politiets tolerance ved kontrol: tiltale rejses ved akseltryk over 7,0 % (eller &gt;500 kg), og totalvægt over 6,0 % (eller &gt;2.000 kg).</p>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="font-semibold mb-2">Køre- og hviletid &mdash; udover 4½-timers reglen</h2>
+    <p class="text-sm text-slate-300 mb-2">Værktøjet under Værktøjer regner kun på hovedreglen (pause hver 4½ time, maks. køretid pr. dag). EU-forordning 561/2006 har mere, som værktøjet ikke fanger:</p>
+    <ul class="text-sm text-slate-300 list-disc pl-5 space-y-1">
+      <li><span class="text-blue-300">Delt pause.</span> 45-minutters pausen kan i stedet tages som mindst 15 min. efterfulgt af mindst 30 min.</li>
+      <li><span class="text-blue-300">Ugentlig køretid.</span> Maks. 56 timer pr. uge, eller maks. 90 timer over to på hinanden følgende uger.</li>
+      <li><span class="text-blue-300">Reduceret døgnhvile.</span> Ned til 9 sammenhængende timer, op til 3 gange om ugen (normalt er kravet 11 timer).</li>
+      <li><span class="text-blue-300">To chauffører.</span> Begge skal have mindst 9 timers hvile inden for en periode på 30 timer.</li>
+      <li><span class="text-blue-300">Færge/tog.</span> Det daglige hvil kan afbrydes op til 2 gange (maks. 1 time i alt) for om- og frakørsel, hvis chaufføren har adgang til en seng.</li>
+      <li><span class="text-blue-300">Force majeure.</span> Reglerne kan fraviges for at nå et sikkert stoppested &mdash; skal noteres manuelt, og kun årsager der opstår under selve kørslen tæller.</li>
+      <li><span class="text-blue-300">Bøder i Danmark (eksempler).</span> 30 % for meget køretid: 3.000 kr. til chaufføren, 6.000 kr. til vognmanden. 11 % for lidt hviletid: 1.500 / 2.500 kr. Grove eller gentagne overtrædelser kan give frakendelse af førerretten.</li>
+    </ul>
+  </div>
+
+  <div class="card p-4">
+    <h2 class="font-semibold mb-2">Bæredygtighed i godstransport</h2>
+    <p class="text-sm text-slate-300 mb-2">Godstransport står for ca. 8 % af de globale CO2-udledninger, plus 1&ndash;2 % fra lager og terminaler. Uden indgreb ventes udledningerne fra global godstransport at vokse 118 % frem mod 2050 (OECD/ITF, 2019). Tre veje til at bremse det, som går igen på tværs af transportformer:</p>
+    <ol class="text-sm text-slate-300 list-decimal pl-5 space-y-1 mb-3">
+      <li>Reducér CO2 pr. transporteret enhed (elektrificering, alternative brændstoffer, mere effektive køretøjer).</li>
+      <li>Effektiviser transportarbejdet (bedre kapacitetsudnyttelse, modalskift til lettere transportformer).</li>
+      <li>Reducér selve godsmængden (cirkulær økonomi, mindre spild, relokalisering, digitalisering).</li>
+    </ol>
+    <p class="text-sm text-slate-300 mb-2">Konkrete tal at bruge i en analyse:</p>
+    <ul class="text-sm text-slate-300 list-disc pl-5 space-y-1">
+      <li><span class="text-blue-300">Tomkørsel.</span> Ca. 22 % af lastbilkørslen i EU foregår helt tom (21 % USA, 30&ndash;50 % Latinamerika). Just-in-time med hyppige, små leverancer forstærker problemet.</li>
+      <li><span class="text-blue-300">Slow steaming.</span> 10 % lavere sejlhastighed for et skib sænker brændstofforbruget med ca. 23 % (IMO) &mdash; men transporttiden stiger tilsvarende.</li>
+      <li><span class="text-blue-300">Højkapacitetstransport.</span> Større/tungere lastbiler kan halvere CO2 pr. ton gods (eksempel: 43,8 kg CO2/ton ved almindelig transport mod 20,3 kg CO2/ton ved højkapacitet).</li>
+      <li><span class="text-blue-300">Sidste-mile.</span> CO2 fra sidste mile-levering i de 100 største byer er steget 32 %, drevet af e-handel. Op til 30 % kan spares med bedre ruteplanlægning, lastpooling og bredere leveringsvinduer.</li>
+    </ul>
+  </div>
+
+  <div class="card p-4">
     <h2 class="font-semibold mb-2">Vejledende CO2-faktorer</h2>
     <div class="scroll"><table class="text-sm w-full min-w-[380px]">
       <thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Transportform</th><th class="text-right">g CO2 pr. tonkm</th></tr></thead>
@@ -563,6 +662,11 @@
       <li>International Chamber of Commerce: <i>Incoterms® 2020</i>. Grundlag for leveringsbetingelserne under punkt B.</li>
       <li>ISO 14083:2023: <i>Greenhouse gases — Quantification and reporting of greenhouse gas emissions arising from transport chain operations</i>.</li>
       <li>Smart Freight Centre: <i>GLEC Framework for Logistics Emissions Accounting and Reporting</i>.</li>
+      <li>EU-forordning (EF) 561/2006 om køre- og hviletid, samt undervisningsnoterne "Landevejstransport (teori)", 3. semester. Grundlag for Køre- &amp; hviletid-værktøjet og uddybningen i Teori.</li>
+      <li>CMR-konventionen (vej), Hague-Visby-reglerne (sø), Montreal-konventionen 1999 (luft) og CIM/COTIF-konventionen (bane), via undervisningsnoterne "Strukturen på Transportmarkedet (teori)". Grundlag for ansvarstabellen.</li>
+      <li>ICAO's ni luftfartsfriheder ("Freedoms of the Air"), via undervisningsnoterne til Luftfragt.</li>
+      <li>ITD (International Transport Danmark): <i>Total- og vogntogsvægte i DK</i>, maj 2018. Grundlag for de danske vægtgrænser.</li>
+      <li>OECD/International Transport Forum: <i>ITF Transport Outlook</i>, 2019, og undervisningsnoterne "Decarbonising the Movement of Freight". Grundlag for bæredygtighedsafsnittet.</li>
       <li>Casene Air Birgers Møbler, Sea Birgers Møbler og DanMeat er undervisningsmateriale fra faget Distribution, 3. semester, og bruges som kontrolberegninger med kendt facit.</li>
     </ul>
   </div>
