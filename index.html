@@ -413,7 +413,14 @@
   </div>
 
   <div id="vtool-hviletid" class="card p-4 vtoolpanel hidden">
-    <p class="text-sm text-slate-400">Bygges som næste skridt.</p>
+    <h2 class="font-semibold mb-1">Chaufførens køre- &amp; hviletid</h2>
+    <p class="text-xs text-slate-400 mb-3">EU&rsquo;s køre- og hviletidsregler for erhvervschauffører: pause hver 4&frac12; time, maks. køretid pr. dag, og krav om døgnhvile. <strong>Kilde:</strong> EU-forordning 561/2006 (forenklet gengivelse). Ikke juridisk rådgivning &mdash; tjek altid de fulde, gældende regler.</p>
+    <div class="flex flex-wrap gap-4 items-end">
+      <div><div class="text-xs text-slate-400 mb-1">Ønsket køretid i alt (timer)</div><input id="vtHvKoeretid" class="num w-28" value="0"></div>
+      <div><div class="text-xs text-slate-400 mb-1">Maks. køretid pr. dag (timer)</div><input id="vtHvMaksDag" class="num w-28" value="9"></div>
+      <div id="vtHvBrugRuteWrap" class="hidden"></div>
+    </div>
+    <div id="vtHvResultat" class="mt-4"></div>
   </div>
   <div id="vtool-fragtpr" class="card p-4 vtoolpanel hidden">
     <p class="text-sm text-slate-400">Bygges som næste skridt.</p>
@@ -1276,6 +1283,7 @@ function tegnVurdering(r) {
   const add = (type, tekst) => k.push({ type: type, tekst: tekst });
 
   if (typeof vtRuteNote === 'string' && vtRuteNote) add('info', vtRuteNote);
+  if (typeof vtHvNote === 'string' && vtHvNote) add('info', vtHvNote);
 
   // valutakontrol: en post i fremmed valuta uden kurs bliver stille talt som 0 kr.
   const brugteVal = [state.valutaFragt].concat(state.linjer.filter(l => l.aktiv && l.type !== 'pct').map(l => l.valuta));
@@ -4416,6 +4424,13 @@ function nulstilVaerktoejer() {
   if (fraFelt) fraFelt.value = '';
   if (tilFelt) tilFelt.value = '';
   if (boks) boks.innerHTML = '';
+
+  vtHvNote = '';
+  const hvKoeretid = $('#vtHvKoeretid'), hvMaksDag = $('#vtHvMaksDag'), hvBoks = $('#vtHvResultat');
+  if (hvKoeretid) hvKoeretid.value = '0';
+  if (hvMaksDag) hvMaksDag.value = '9';
+  if (hvBoks) hvBoks.innerHTML = '';
+  opdaterVtHvHint();
 }
 
 function initVaerktoejer() {
@@ -4431,6 +4446,9 @@ function initVaerktoejer() {
   $('#vtRuteFra').addEventListener('input', debounceRute);
   $('#vtRuteTil').addEventListener('input', debounceRute);
   $('#vtRuteKoeretoej').addEventListener('change', () => { if (vtRuteSidst) visVtRuteResultat(); });
+
+  $('#vtHvKoeretid').addEventListener('input', beregnVtHv);
+  $('#vtHvMaksDag').addEventListener('input', beregnVtHv);
 }
 
 async function vtGeocode(sted) {
@@ -4480,8 +4498,10 @@ function visVtRuteResultat() {
   const d = vtRuteSidst;
   const faktor = num($('#vtRuteKoeretoej').value);
   const lastbilTimer = d.carTimer * faktor;
+  d.lastbilTimer = lastbilTimer;
   const hh = Math.floor(lastbilTimer), mm = Math.round((lastbilTimer - hh) * 60);
   const kmAfrundet = Math.round(d.km);
+  opdaterVtHvHint();
   const anvendt = num(state.afstand) === kmAfrundet && vtRuteNote.indexOf(d.fraQ + ' → ' + d.tilQ) >= 0;
 
   $('#vtRuteResultat').innerHTML =
@@ -4507,6 +4527,61 @@ function visVtRuteResultat() {
       visVtRuteResultat();
     });
   }
+}
+
+// ---- Køre- & hviletid ----
+let vtHvNote = '';
+
+function opdaterVtHvHint() {
+  const wrap = $('#vtHvBrugRuteWrap');
+  if (!wrap) return;
+  if (vtRuteSidst && vtRuteSidst.lastbilTimer > 0) {
+    const t = vtRuteSidst.lastbilTimer;
+    wrap.classList.remove('hidden');
+    wrap.innerHTML = '<button id="vtHvBrugRute" class="text-sm bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg">Brug køretiden fra Ruteafstand (' + fmt(t, 1) + ' t)</button>';
+    $('#vtHvBrugRute').addEventListener('click', () => {
+      $('#vtHvKoeretid').value = t.toFixed(1);
+      beregnVtHv();
+    });
+  } else {
+    wrap.classList.add('hidden');
+    wrap.innerHTML = '';
+  }
+}
+
+function beregnVtHv() {
+  const totalTimer = num($('#vtHvKoeretid').value), maksDag = num($('#vtHvMaksDag').value) || 9;
+  const boks = $('#vtHvResultat');
+  if (!(totalTimer > 0)) { boks.innerHTML = ''; vtHvNote = ''; return; }
+
+  let resterer = totalTimer, dage = 0, pauseMinIAlt = 0;
+  while (resterer > 0) {
+    dage++;
+    const dagensKoersel = Math.min(resterer, maksDag);
+    const pauserIDag = Math.floor(dagensKoersel / 4.5);
+    pauseMinIAlt += pauserIDag * 45;
+    resterer -= dagensKoersel;
+  }
+  const overnatninger = Math.max(dage - 1, 0);
+  const rejsetidIAlt = totalTimer + pauseMinIAlt / 60;
+  const antalPauser = Math.round(pauseMinIAlt / 45);
+
+  boks.innerHTML = '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">' +
+    kpi('Antal køredage', dage, '') +
+    kpi('Lovpligtige pauser (45 min)', antalPauser, '') +
+    kpi('Samlet pausetid', fmt(pauseMinIAlt, 0) + ' min', '') +
+    kpi('Rejsetid inkl. pauser', fmt(rejsetidIAlt, 1) + ' t', '') +
+    kpi('Overnatninger (min. 11 t hvile)', overnatninger, '') +
+    '</div>' +
+    '<p class="text-xs text-slate-400 mt-3">' + (dage > 1
+      ? 'Turen kan ikke køres på én dag inden for reglerne. Der skal ' + overnatninger + ' overnatning(er) med mindst 11 timers sammenhængende hviletid, samt ' + antalPauser + ' pause(r) af 45 minutter undervejs (efter hver 4½ times kørsel).'
+      : 'Turen kan gennemføres på én dag. Der skal dog holdes ' + antalPauser + ' pause(r) af 45 minutter efter hver 4½ times sammenhængende kørsel — reglerne gælder, uanset hvor kort eller lang turen er.') + '</p>';
+
+  const transportTidCase = num(state.transportTid);
+  vtHvNote = 'Køre- & hviletid-værktøjet: ' + fmt(totalTimer, 1) + ' t køretid kræver ' + dage + ' køredag(e) og ' + antalPauser + ' pause(r) af 45 min, jf. EU-forordning 561/2006 (forenklet).' +
+    (transportTidCase > 0 && transportTidCase !== dage
+      ? ' Casen angiver ' + fmt(transportTidCase, 0) + ' dage under punkt F som transporttid — tjek om det stemmer med de ' + dage + ' køredag(e) her, eller om forskellen skyldes fx om- og omladning.'
+      : '');
 }
 
 bind();
