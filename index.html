@@ -38,6 +38,7 @@
     <button data-tab="beregner" class="tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap">2. Beregning</button>
     <button data-tab="vurdering" class="tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap">3. Nøgletal &amp; vurdering</button>
     <button data-tab="sammenlign" class="tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap">4. Sammenlign</button>
+    <button data-tab="vaerktoj" class="tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap">Værktøjer</button>
     <button data-tab="teori" class="tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap">Teori</button>
   </div>
 </header>
@@ -383,6 +384,42 @@
       <div id="vaegtSum" class="text-xs text-slate-400 pb-2"></div>
     </div>
     <div id="pointBoks" class="scroll"></div>
+  </div>
+</section>
+
+<!-- ============ VÆRKTØJER ============ -->
+<section id="tab-vaerktoj" class="hidden space-y-4">
+  <div class="card p-4">
+    <p class="text-xs text-slate-400 mb-3">Selvstændige lommeregnere til transport. De regner automatisk, mens du skriver, og bruges typisk til spørgsmål ved siden af selve casen.</p>
+    <div id="vtoolNav" class="flex flex-wrap gap-2"></div>
+  </div>
+
+  <div id="vtool-rute" class="card p-4 vtoolpanel">
+    <h2 class="font-semibold mb-1">Ruteafstand &amp; køretid</h2>
+    <p class="text-xs text-slate-400 mb-3">Afstand og anslået køretid mellem to byer, hentet fra en offentlig korttjeneste (OpenStreetMap/OSRM). Vejledende — erstatter ikke en fuld vurdering af køre- og hviletidsreglerne.</p>
+    <div class="flex flex-wrap gap-4 items-end">
+      <div><div class="text-xs text-slate-400 mb-1">Fra by</div><input id="vtRuteFra" class="w-40" value="Vejle"></div>
+      <div><div class="text-xs text-slate-400 mb-1">Til by</div><input id="vtRuteTil" class="w-40" value="København"></div>
+      <div><div class="text-xs text-slate-400 mb-1">Køretøj</div>
+        <select id="vtRuteKoeretoej" class="text-sm">
+          <option value="1">Varevogn (ingen pauseregler)</option>
+          <option value="1.05" selected>Lastbil u. trailer</option>
+          <option value="1.1">Lastbil m. trailer/sættevogn</option>
+        </select>
+      </div>
+    </div>
+    <div id="vtRuteResultat" class="mt-4"></div>
+    <p class="text-[11px] text-slate-500 mt-2">Data fra OpenStreetMap (Nominatim) &amp; OSRM &mdash; gratis, offentlige rutetjenester. Kan af og til være langsomme eller utilgængelige.</p>
+  </div>
+
+  <div id="vtool-hviletid" class="card p-4 vtoolpanel hidden">
+    <p class="text-sm text-slate-400">Bygges som næste skridt.</p>
+  </div>
+  <div id="vtool-fragtpr" class="card p-4 vtoolpanel hidden">
+    <p class="text-sm text-slate-400">Bygges som næste skridt.</p>
+  </div>
+  <div id="vtool-trailer" class="card p-4 vtoolpanel hidden">
+    <p class="text-sm text-slate-400">Bygges som næste skridt.</p>
   </div>
 </section>
 
@@ -1237,6 +1274,8 @@ function tegnVurdering(r) {
   // --- kritiske kommentarer ---
   const k = [];
   const add = (type, tekst) => k.push({ type: type, tekst: tekst });
+
+  if (typeof vtRuteNote === 'string' && vtRuteNote) add('info', vtRuteNote);
 
   // valutakontrol: en post i fremmed valuta uden kurs bliver stille talt som 0 kr.
   const brugteVal = [state.valutaFragt].concat(state.linjer.filter(l => l.aktiv && l.type !== 'pct').map(l => l.valuta));
@@ -4078,7 +4117,7 @@ function bind() {
   $$('.tabbtn').forEach(b => b.addEventListener('click', () => {
     $$('.tabbtn').forEach(x => { x.className = 'tabbtn px-3 py-2 border-b-2 border-transparent text-slate-400 whitespace-nowrap'; });
     b.className = 'tabbtn px-3 py-2 border-b-2 border-blue-500 text-white whitespace-nowrap';
-    ['case', 'beregner', 'vurdering', 'sammenlign', 'teori'].forEach(t => $('#tab-' + t).classList.toggle('hidden', t !== b.dataset.tab));
+    ['case', 'beregner', 'vurdering', 'sammenlign', 'vaerktoj', 'teori'].forEach(t => $('#tab-' + t).classList.toggle('hidden', t !== b.dataset.tab));
     if (b.dataset.tab === 'sammenlign') tegnSammenlign();
     if (b.dataset.tab === 'vurdering') tegnResultat();
   }));
@@ -4357,7 +4396,91 @@ function fallbackKopi(txt, ok) {
   document.body.removeChild(ta);
 }
 
+// ============ VÆRKTØJER (selvstændige transport-lommeregnere) ============
+const VTOOLS = [
+  { id: 'rute', navn: 'Ruteafstand & køretid' },
+  { id: 'hviletid', navn: 'Køre- & hviletid' },
+  { id: 'fragtpr', navn: 'Fragtomkostning pr. enhed/km' },
+  { id: 'trailer', navn: 'Trailerkapacitet' }
+];
+const vtoolAktivKlasse = 'vtoolbtn text-sm px-3 py-1.5 rounded-lg bg-blue-600 text-white';
+const vtoolInaktivKlasse = 'vtoolbtn text-sm px-3 py-1.5 rounded-lg bg-[#1b2534] text-slate-300 hover:bg-[#243044]';
+let vtRuteNote = '';
+let vtRuteKald = 0;
+
+function initVaerktoejer() {
+  $('#vtoolNav').innerHTML = VTOOLS.map((t, i) =>
+    '<button data-vtool="' + t.id + '" class="' + (i === 0 ? vtoolAktivKlasse : vtoolInaktivKlasse) + '">' + t.navn + '</button>').join('');
+  $$('.vtoolbtn').forEach(b => b.addEventListener('click', () => {
+    $$('.vtoolbtn').forEach(x => { x.className = vtoolInaktivKlasse; });
+    b.className = vtoolAktivKlasse;
+    VTOOLS.forEach(t => $('#vtool-' + t.id).classList.toggle('hidden', t.id !== b.dataset.vtool));
+  }));
+
+  const debounceRute = () => { clearTimeout(vtRuteKald); vtRuteKald = setTimeout(beregnVtRute, 700); };
+  $('#vtRuteFra').addEventListener('input', debounceRute);
+  $('#vtRuteTil').addEventListener('input', debounceRute);
+  $('#vtRuteKoeretoej').addEventListener('change', beregnVtRute);
+  beregnVtRute();
+}
+
+async function vtGeocode(sted) {
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(sted);
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error('geocode');
+  const data = await res.json();
+  if (!data.length) throw new Error('ikke fundet');
+  return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+}
+
+let vtRuteSidst = null;
+let vtRuteAktivtKald = 0;
+async function beregnVtRute() {
+  const fraQ = $('#vtRuteFra').value.trim(), tilQ = $('#vtRuteTil').value.trim();
+  const boks = $('#vtRuteResultat');
+  if (!fraQ || !tilQ) { boks.innerHTML = ''; return; }
+  const dette = ++vtRuteAktivtKald;
+  boks.innerHTML = '<p class="text-xs text-slate-400">Henter rute&hellip;</p>';
+  try {
+    const [fra, til] = await Promise.all([vtGeocode(fraQ), vtGeocode(tilQ)]);
+    const url = 'https://router.project-osrm.org/route/v1/driving/' + fra.lon + ',' + fra.lat + ';' + til.lon + ',' + til.lat + '?overview=false';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('rute');
+    const data = await res.json();
+    if (!data.routes || !data.routes.length) throw new Error('ingen rute');
+    if (dette !== vtRuteAktivtKald) return;
+    vtRuteSidst = { fraQ: fraQ, tilQ: tilQ, km: data.routes[0].distance / 1000, carTimer: data.routes[0].duration / 3600 };
+    visVtRuteResultat();
+  } catch (e) {
+    if (dette !== vtRuteAktivtKald) return;
+    boks.innerHTML = '<div class="border border-amber-800 bg-amber-950/20 rounded-xl p-3 text-xs text-slate-300">Kunne ikke hente rute lige nu (den gratis korttjeneste kan være midlertidigt optaget). Prøv igen om lidt, eller tjek at bynavnene er stavet korrekt.</div>';
+  }
+}
+
+function visVtRuteResultat() {
+  if (!vtRuteSidst) return;
+  const d = vtRuteSidst;
+  const faktor = num($('#vtRuteKoeretoej').value);
+  const lastbilTimer = d.carTimer * faktor;
+  const hh = Math.floor(lastbilTimer), mm = Math.round((lastbilTimer - hh) * 60);
+  const kmAfrundet = Math.round(d.km);
+
+  $('#vtRuteResultat').innerHTML = '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">' +
+    kpi('Afstand', fmt(kmAfrundet, 0) + ' km', '') +
+    kpi('Anslået køretid', hh + ' t ' + mm + ' min', 'Inkl. faktor for køretøjstype, uden kørepauser') +
+    kpi('Gns. hastighed', fmt(d.km / lastbilTimer, 0) + ' km/t', '') +
+    '</div>' +
+    '<p class="text-xs text-slate-400 mt-3">Afstanden er automatisk sat ind som "Afstand (km)" under punkt F, og bruges i CO2-udledning og kr./km-nøgletallene på fanen Nøgletal.</p>';
+
+  state.afstand = kmAfrundet;
+  const afstandFelt = $('#afstand');
+  if (afstandFelt) afstandFelt.value = kmAfrundet;
+  vtRuteNote = 'Ruten ' + d.fraQ + ' → ' + d.tilQ + ' er beregnet til ' + fmt(kmAfrundet, 0) + ' km og ' + hh + ' t ' + mm + ' min køretid via værktøjet Ruteafstand & køretid, og er sat ind som afstand under punkt F.';
+  tegnResultat();
+}
+
 bind();
+initVaerktoejer();
 tegnFund();
 tegnGemteCases();
 // Browseren kan genskabe gamle feltvaerdier efter en genindlaesning.
