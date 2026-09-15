@@ -20,9 +20,115 @@
   ::-webkit-scrollbar-thumb { background:#2b3542; border-radius:6px; }
   .badge { font-size:11px; padding:1px 7px; border-radius:999px; }
   .drop.over { border-color:#3b82f6; background:#101a28; }
+
+  /* ===== Temaer ===== */
+  .themebtn { width:22px; height:22px; border-radius:999px; border:2px solid transparent; cursor:pointer; padding:0; }
+  .themebtn.aktiv { border-color:#fff; }
+
+  body[data-theme="dark-green"] { background:#0a140f; color:#e3f3ea; }
+  body[data-theme="dark-green"] .card { background:#0d1a14; border-color:#1c3226; }
+  body[data-theme="dark-green"] input, body[data-theme="dark-green"] select, body[data-theme="dark-green"] textarea { background:#10201a; border-color:#294a3a; color:#e3f3ea; }
+  body[data-theme="dark-green"] ::-webkit-scrollbar-thumb { background:#294a3a; }
+  body[data-theme="dark-green"] .bg-\[\#0d131b\] { background:#0c1a13 !important; }
+  body[data-theme="dark-green"] .border-\[\#1e2836\] { border-color:#1c3226 !important; }
+  body[data-theme="dark-green"] .border-\[\#2b3542\] { border-color:#294a3a !important; }
+  body[data-theme="dark-green"] .bg-\[\#1b2534\] { background:#17291f !important; }
+  body[data-theme="dark-green"] .hover\:bg-\[\#243044\]:hover { background:#1f3a2c !important; }
+  body[data-theme="dark-green"] .bg-blue-600 { background:#16a34a !important; }
+  body[data-theme="dark-green"] .hover\:bg-blue-500:hover { background:#22c55e !important; }
+  body[data-theme="dark-green"] .text-blue-200 { color:#bbf7d0 !important; }
+  body[data-theme="dark-green"] .text-blue-300 { color:#86efac !important; }
+  body[data-theme="dark-green"] .text-blue-400 { color:#4ade80 !important; }
+  body[data-theme="dark-green"] .hover\:text-blue-300:hover { color:#86efac !important; }
+  body[data-theme="dark-green"] .border-blue-500 { border-color:#22c55e !important; }
+  body[data-theme="dark-green"] .border-blue-700 { border-color:#15803d !important; }
+  body[data-theme="dark-green"] .border-blue-800 { border-color:#166534 !important; }
+  body[data-theme="dark-green"] .border-blue-900 { border-color:#14532d !important; }
+  body[data-theme="dark-green"] .bg-blue-950\/20 { background:rgba(6,78,40,.2) !important; }
+  body[data-theme="dark-green"] .bg-blue-950\/30 { background:rgba(6,78,40,.3) !important; }
+  body[data-theme="dark-green"] .bg-blue-950\/40 { background:rgba(6,78,40,.4) !important; }
+  body[data-theme="dark-green"] .bg-blue-900\/60 { background:rgba(20,83,45,.6) !important; }
+  body[data-theme="dark-green"] .drop.over { background:#122a1e; }
+
+  body[data-theme="dark-purple"] { background:#100a17; color:#ede6f5; }
+  body[data-theme="dark-purple"] .card { background:#140d1c; border-color:#2a1f3a; }
+  body[data-theme="dark-purple"] input, body[data-theme="dark-purple"] select, body[data-theme="dark-purple"] textarea { background:#180f22; border-color:#3a2c4d; color:#ede6f5; }
+  body[data-theme="dark-purple"] ::-webkit-scrollbar-thumb { background:#3a2c4d; }
+  body[data-theme="dark-purple"] .bg-\[\#0d131b\] { background:#150e1e !important; }
+  body[data-theme="dark-purple"] .border-\[\#1e2836\] { border-color:#2a1f3a !important; }
+  body[data-theme="dark-purple"] .border-\[\#2b3542\] { border-color:#3a2c4d !important; }
+  body[data-theme="dark-purple"] .bg-\[\#1b2534\] { background:#201530 !important; }
+  body[data-theme="dark-purple"] .hover\:bg-\[\#243044\]:hover { background:#2b1d3f !important; }
+  body[data-theme="dark-purple"] .bg-blue-600 { background:#7c3aed !important; }
+  body[data-theme="dark-purple"] .hover\:bg-blue-500:hover { background:#8b5cf6 !important; }
+  body[data-theme="dark-purple"] .text-blue-200 { color:#ddd6fe !important; }
+  body[data-theme="dark-purple"] .text-blue-300 { color:#c4b5fd !important; }
+  body[data-theme="dark-purple"] .text-blue-400 { color:#a78bfa !important; }
+  body[data-theme="dark-purple"] .hover\:text-blue-300:hover { color:#c4b5fd !important; }
+  body[data-theme="dark-purple"] .border-blue-500 { border-color:#8b5cf6 !important; }
+  body[data-theme="dark-purple"] .border-blue-700 { border-color:#6d28d9 !important; }
+  body[data-theme="dark-purple"] .border-blue-800 { border-color:#5b21b6 !important; }
+  body[data-theme="dark-purple"] .border-blue-900 { border-color:#4c1d95 !important; }
+  body[data-theme="dark-purple"] .bg-blue-950\/20 { background:rgba(46,16,101,.2) !important; }
+  body[data-theme="dark-purple"] .bg-blue-950\/30 { background:rgba(46,16,101,.3) !important; }
+  body[data-theme="dark-purple"] .bg-blue-950\/40 { background:rgba(46,16,101,.4) !important; }
+  body[data-theme="dark-purple"] .bg-blue-900\/60 { background:rgba(76,29,149,.6) !important; }
+  body[data-theme="dark-purple"] .drop.over { background:#1c1329; }
+
+  body[data-theme="light-blue"], body[data-theme="light-warm"] { background:#f4f6f8; color:#16202b; }
+  body[data-theme="light-blue"] .card, body[data-theme="light-warm"] .card { background:#fff; border-color:#dde3ea; }
+  body[data-theme="light-blue"] input, body[data-theme="light-blue"] select, body[data-theme="light-blue"] textarea,
+  body[data-theme="light-warm"] input, body[data-theme="light-warm"] select, body[data-theme="light-warm"] textarea { background:#fff; border-color:#c7d0da; color:#16202b; }
+  body[data-theme="light-blue"] ::-webkit-scrollbar-thumb, body[data-theme="light-warm"] ::-webkit-scrollbar-thumb { background:#c7d0da; }
+  body[data-theme="light-blue"] .bg-\[\#0d131b\], body[data-theme="light-warm"] .bg-\[\#0d131b\] { background:#fff !important; }
+  body[data-theme="light-blue"] .border-\[\#1e2836\], body[data-theme="light-warm"] .border-\[\#1e2836\] { border-color:#dde3ea !important; }
+  body[data-theme="light-blue"] .border-\[\#2b3542\], body[data-theme="light-warm"] .border-\[\#2b3542\] { border-color:#c7d0da !important; }
+  body[data-theme="light-blue"] .hover\:border-slate-500:hover, body[data-theme="light-warm"] .hover\:border-slate-500:hover { border-color:#9fb0c0 !important; }
+  body[data-theme="light-blue"] .bg-\[\#1b2534\], body[data-theme="light-warm"] .bg-\[\#1b2534\] { background:#e8edf3 !important; }
+  body[data-theme="light-blue"] .hover\:bg-\[\#243044\]:hover, body[data-theme="light-warm"] .hover\:bg-\[\#243044\]:hover { background:#dbe3ec !important; }
+  body[data-theme="light-blue"] .bg-slate-700, body[data-theme="light-warm"] .bg-slate-700,
+  body[data-theme="light-blue"] .bg-slate-800, body[data-theme="light-warm"] .bg-slate-800 { background:#e2e8f0 !important; }
+  body[data-theme="light-blue"] .text-slate-200, body[data-theme="light-warm"] .text-slate-200 { color:#16202b !important; }
+  body[data-theme="light-blue"] .text-slate-300, body[data-theme="light-warm"] .text-slate-300 { color:#33404d !important; }
+  body[data-theme="light-blue"] .text-slate-400, body[data-theme="light-warm"] .text-slate-400 { color:#5b6b7a !important; }
+  body[data-theme="light-blue"] .text-slate-500, body[data-theme="light-warm"] .text-slate-500 { color:#7c8b99 !important; }
+  body[data-theme="light-blue"] .text-emerald-300, body[data-theme="light-warm"] .text-emerald-300 { color:#15803d !important; }
+  body[data-theme="light-blue"] .text-emerald-400, body[data-theme="light-warm"] .text-emerald-400 { color:#16a34a !important; }
+  body[data-theme="light-blue"] .text-amber-200, body[data-theme="light-warm"] .text-amber-200 { color:#92400e !important; }
+  body[data-theme="light-blue"] .text-amber-300, body[data-theme="light-warm"] .text-amber-300 { color:#b45309 !important; }
+  body[data-theme="light-blue"] .text-amber-400, body[data-theme="light-warm"] .text-amber-400 { color:#b45309 !important; }
+  body[data-theme="light-blue"] .text-red-200, body[data-theme="light-warm"] .text-red-200 { color:#991b1b !important; }
+  body[data-theme="light-blue"] .text-red-300, body[data-theme="light-warm"] .text-red-300 { color:#b91c1c !important; }
+  body[data-theme="light-blue"] .text-red-400, body[data-theme="light-warm"] .text-red-400 { color:#dc2626 !important; }
+  body[data-theme="light-blue"] .drop.over, body[data-theme="light-warm"] .drop.over { background:#eef2f7; }
+  body[data-theme="light-blue"] .tabbtn.text-white { color:#1d4ed8 !important; }
+  body[data-theme="light-blue"] .bg-blue-950\/40.text-white { background:rgba(37,99,235,.9) !important; }
+  body[data-theme="light-blue"] .text-blue-200 { color:#1e40af !important; }
+  body[data-theme="light-blue"] .text-blue-300 { color:#1d4ed8 !important; }
+  body[data-theme="light-blue"] .text-blue-400 { color:#2563eb !important; }
+  body[data-theme="light-blue"] .hover\:text-blue-300:hover { color:#1d4ed8 !important; }
+  body[data-theme="light-blue"] .bg-blue-900\/60 { background:rgba(37,99,235,.15) !important; }
+
+  body[data-theme="light-warm"] .tabbtn.text-white { color:#c2410c !important; }
+  body[data-theme="light-warm"] .bg-blue-600 { background:#ea580c !important; }
+  body[data-theme="light-warm"] .hover\:bg-blue-500:hover { background:#f97316 !important; }
+  body[data-theme="light-warm"] .text-blue-200 { color:#9a3412 !important; }
+  body[data-theme="light-warm"] .text-blue-300 { color:#c2410c !important; }
+  body[data-theme="light-warm"] .text-blue-400 { color:#ea580c !important; }
+  body[data-theme="light-warm"] .hover\:text-blue-300:hover { color:#c2410c !important; }
+  body[data-theme="light-warm"] .border-blue-500 { border-color:#f97316 !important; }
+  body[data-theme="light-warm"] .border-blue-700 { border-color:#c2410c !important; }
+  body[data-theme="light-warm"] .border-blue-800 { border-color:#9a3412 !important; }
+  body[data-theme="light-warm"] .border-blue-900 { border-color:#7c2d12 !important; }
+  body[data-theme="light-warm"] .bg-blue-950\/20 { background:rgba(124,45,18,.12) !important; }
+  body[data-theme="light-warm"] .bg-blue-950\/30 { background:rgba(124,45,18,.18) !important; }
+  body[data-theme="light-warm"] .bg-blue-950\/40 { background:rgba(124,45,18,.24) !important; }
+  body[data-theme="light-warm"] .bg-blue-950\/40.text-white { background:rgba(234,88,12,.9) !important; }
+  body[data-theme="light-warm"] .bg-blue-900\/60 { background:rgba(124,45,18,.15) !important; }
 </style>
 </head>
 <body class="min-h-screen">
+<script>(function(){try{var t=localStorage.getItem('fragtanalyseTema');if(t&&t!=='dark-blue')document.body.dataset.theme=t;}catch(e){}})();</script>
 
 <header class="border-b border-[#1e2836] bg-[#0d131b] sticky top-0 z-20">
   <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
@@ -30,7 +136,12 @@
       <div class="text-xl font-bold leading-tight">FragtAnalyse</div>
       <div class="text-[11px] text-slate-500">Fragtpligtig vægt, transportpris og totalomkostning &mdash; luft, sø, bane og vej</div>
     </div>
-    <div class="ml-auto flex items-center gap-2">
+    <div class="ml-auto flex items-center gap-1.5" id="temaVaelger">
+      <button class="themebtn" data-tema="dark-blue" title="Mørk, blå (standard)" style="background:linear-gradient(135deg,#0b0f14 50%,#2563eb 50%)"></button>
+      <button class="themebtn" data-tema="dark-green" title="Mørk, grøn" style="background:linear-gradient(135deg,#0a140f 50%,#16a34a 50%)"></button>
+      <button class="themebtn" data-tema="dark-purple" title="Mørk, lilla" style="background:linear-gradient(135deg,#100a17 50%,#7c3aed 50%)"></button>
+      <button class="themebtn" data-tema="light-blue" title="Lys, blå" style="background:linear-gradient(135deg,#f4f6f8 50%,#2563eb 50%)"></button>
+      <button class="themebtn" data-tema="light-warm" title="Lys, orange" style="background:linear-gradient(135deg,#f4f6f8 50%,#ea580c 50%)"></button>
     </div>
   </div>
   <div class="max-w-6xl mx-auto px-4 flex gap-1 text-sm overflow-x-auto">
@@ -4882,8 +4993,24 @@ function nulstilVtTr() {
   vtTrSyncFraCase();
 }
 
+function initTema() {
+  const gemt = (function () { try { return localStorage.getItem('fragtanalyseTema') || 'dark-blue'; } catch (e) { return 'dark-blue'; } })();
+  $$('.themebtn').forEach(b => {
+    b.classList.toggle('aktiv', b.dataset.tema === gemt);
+    b.addEventListener('click', () => {
+      const valgt = b.dataset.tema;
+      if (valgt === 'dark-blue') delete document.body.dataset.theme;
+      else document.body.dataset.theme = valgt;
+      try { localStorage.setItem('fragtanalyseTema', valgt); } catch (e) {}
+      $$('.themebtn').forEach(x => x.classList.remove('aktiv'));
+      b.classList.add('aktiv');
+    });
+  });
+}
+
 bind();
 initVaerktoejer();
+initTema();
 tegnFund();
 tegnGemteCases();
 // Browseren kan genskabe gamle feltvaerdier efter en genindlaesning.
