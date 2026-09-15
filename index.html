@@ -2363,6 +2363,10 @@ function konklusionNoter(r) {
   if (udeladte.length) n.push('Casen nævner også ' + listeMedOg(udeladte.map(f => navnIProsa(f.label) + ' på ' + String(f.vaerdi).replace(/ fast$/, ''))) +
     ', som ikke er med i beregningen. Tjek om ' + (udeladte.length > 1 ? 'de hører' : 'den hører') + ' til forsendelsen.');
   n.push('Husk leveringsbetingelsen. Incoterms afgør, hvem der betaler og bærer risikoen på hver strækning, og dermed hvilke poster der overhovedet er dine.');
+  if (typeof vtRuteNote === 'string' && vtRuteNote) n.push(vtRuteNote);
+  if (typeof vtHvNote === 'string' && vtHvNote) n.push(vtHvNote);
+  if (typeof vtFrNote === 'string' && vtFrNote) n.push(vtFrNote);
+  if (typeof vtTrNote === 'string' && vtTrNote) n.push(vtTrNote);
   return n;
 }
 
@@ -4592,6 +4596,7 @@ function initVaerktoejer() {
     $$('.vtoolbtn').forEach(x => { x.className = vtoolInaktivKlasse; });
     b.className = vtoolAktivKlasse;
     VTOOLS.forEach(t => $('#vtool-' + t.id).classList.toggle('hidden', t.id !== b.dataset.vtool));
+    if (b.dataset.vtool === 'trailer') { vtTrBesoegt = true; beregnVtTr(); }
   }));
 
   const debounceRute = () => { clearTimeout(vtRuteKald); vtRuteKald = setTimeout(beregnVtRute, 700); };
@@ -4795,6 +4800,7 @@ function beregnVtFr() {
 let vtTrNote = '';
 let vtTrLastManuel = false;
 let vtTrVolManuel = false;
+let vtTrBesoegt = false;
 
 function vtTrOpdaterNote() {
   const auto = !vtTrLastManuel && !vtTrVolManuel;
@@ -4837,15 +4843,18 @@ function beregnVtTr() {
       : '<p class="text-xs text-slate-400 mt-3">Der er ' + fmt(restVaegt, 0) + ' kg vægtkapacitet tilbage (' + fmt(100 - vaegtUdnyt, 1) + ' % ledig). ' +
         (volUdnyt > vaegtUdnyt ? 'Traileren løber tør for plads (volumen) før vægt — typisk for lette, store varer.' : 'Traileren løber tør for vægt før plads — typisk for tunge, kompakte varer.') + '</p>');
 
-  vtTrNote = 'Trailerkapacitet-værktøjet: ' + fmt(last, 0) + ' kg gods i en ' + $('#vtTrType option:checked').textContent.toLowerCase() +
-    ' giver ' + fmt(vaegtUdnyt, 0) + ' % vægtudnyttelse og ' + fmt(volUdnyt, 0) + ' % volumenudnyttelse.' +
-    (overlaes ? ' OBS: overlæs på ' + fmt(Math.abs(restVaegt), 0) + ' kg.' : '');
+  vtTrNote = vtTrBesoegt
+    ? 'Trailerkapacitet-værktøjet: ' + fmt(last, 0) + ' kg gods i en ' + $('#vtTrType option:checked').textContent.toLowerCase() +
+      ' giver ' + fmt(vaegtUdnyt, 0) + ' % vægtudnyttelse og ' + fmt(volUdnyt, 0) + ' % volumenudnyttelse.' +
+      (overlaes ? ' OBS: overlæs på ' + fmt(Math.abs(restVaegt), 0) + ' kg.' : '')
+    : '';
 }
 
 function nulstilVtTr() {
   vtTrNote = '';
   vtTrLastManuel = false;
   vtTrVolManuel = false;
+  vtTrBesoegt = false;
   $('#vtTrType').value = 'box';
   vtTrAnvendPreset();
   const boks = $('#vtTrResultat');
