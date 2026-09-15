@@ -433,7 +433,36 @@
     <div id="vtFrResultat" class="mt-4"></div>
   </div>
   <div id="vtool-trailer" class="card p-4 vtoolpanel hidden">
-    <p class="text-sm text-slate-400">Bygges som næste skridt.</p>
+    <h2 class="font-semibold mb-1">Lastbil- &amp; trailerkapacitet</h2>
+    <p class="text-xs text-slate-400 mb-3">Om godset er inden for køretøjets vægt- og volumenkapacitet. Vejledende &mdash; tager ikke højde for akseltryk, vægtfordeling m.m.</p>
+    <div class="flex flex-wrap gap-4 items-end mb-3">
+      <div><div class="text-xs text-slate-400 mb-1">Trailertype</div>
+        <select id="vtTrType" class="text-sm">
+          <option value="box">Standard gardin-/boxtrailer</option>
+          <option value="tank">Tanktrailer</option>
+          <option value="reefer">Køletrailer</option>
+          <option value="flatbed">Ladtrailer/flatbed</option>
+          <option value="container40">40 fods containerchassis</option>
+        </select>
+      </div>
+      <button id="vtTrHentCase" class="text-sm bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg">Hent godsets vægt &amp; volumen fra casen</button>
+    </div>
+    <div class="flex flex-wrap gap-4 items-end">
+      <div><div class="text-xs text-slate-400 mb-1">Tilladt totalvægt, vogntog (kg)</div><input id="vtTrMaxvaegt" class="num w-32" value="44000"></div>
+      <div><div class="text-xs text-slate-400 mb-1">Køretøjets egenvægt (kg)</div><input id="vtTrTare" class="num w-32" value="14500"></div>
+      <div><div class="text-xs text-slate-400 mb-1">Godsets vægt (kg)</div><input id="vtTrLast" class="num w-32" value="0"></div>
+    </div>
+    <div class="flex flex-wrap gap-4 items-end mt-3">
+      <div><div class="text-xs text-slate-400 mb-1">Trailer L×B×H (m)</div>
+        <div class="flex gap-2">
+          <input id="vtTrL" class="num w-20" value="13.6">
+          <input id="vtTrB" class="num w-20" value="2.48">
+          <input id="vtTrH" class="num w-20" value="2.7">
+        </div>
+      </div>
+      <div><div class="text-xs text-slate-400 mb-1">Godsets volumen (m³)</div><input id="vtTrVolumen" class="num w-32" value="0"></div>
+    </div>
+    <div id="vtTrResultat" class="mt-4"></div>
   </div>
 </section>
 
@@ -1292,6 +1321,7 @@ function tegnVurdering(r) {
   if (typeof vtRuteNote === 'string' && vtRuteNote) add('info', vtRuteNote);
   if (typeof vtHvNote === 'string' && vtHvNote) add('info', vtHvNote);
   if (typeof vtFrNote === 'string' && vtFrNote) add('info', vtFrNote);
+  if (typeof vtTrNote === 'string' && vtTrNote) add('info', vtTrNote);
 
   // valutakontrol: en post i fremmed valuta uden kurs bliver stille talt som 0 kr.
   const brugteVal = [state.valutaFragt].concat(state.linjer.filter(l => l.aktiv && l.type !== 'pct').map(l => l.valuta));
@@ -4446,6 +4476,8 @@ function nulstilVaerktoejer() {
   if (frUnits) frUnits.value = '0';
   if (frKm) frKm.value = '0';
   if (frBoks) frBoks.innerHTML = '';
+
+  if ($('#vtTrType')) nulstilVtTr();
 }
 
 function initVaerktoejer() {
@@ -4468,6 +4500,31 @@ function initVaerktoejer() {
   $('#vtFrCost').addEventListener('input', beregnVtFr);
   $('#vtFrUnits').addEventListener('input', beregnVtFr);
   $('#vtFrKm').addEventListener('input', beregnVtFr);
+
+  $('#vtTrType').addEventListener('change', () => { vtTrAnvendPreset(); beregnVtTr(); });
+  ['vtTrMaxvaegt', 'vtTrTare', 'vtTrLast', 'vtTrL', 'vtTrB', 'vtTrH', 'vtTrVolumen'].forEach(id => $('#' + id).addEventListener('input', beregnVtTr));
+  $('#vtTrHentCase').addEventListener('click', () => {
+    const r = beregn();
+    $('#vtTrLast').value = String(Math.round(r.faktiskVaegt));
+    $('#vtTrVolumen').value = String(Math.round(r.volumen * 1000) / 1000);
+    beregnVtTr();
+  });
+  beregnVtTr();
+}
+
+const VT_TRAILER_PRESETS = {
+  box: { l: 13.6, w: 2.48, h: 2.7, tare: 14500, maxvaegt: 44000, note: 'Standard gardin-/boxtrailer — almindeligt stykgods på paller.' },
+  tank: { l: 13.6, w: 2.5, h: 2.6, tare: 17000, maxvaegt: 44000, note: 'Tanktrailer — angiv godsvolumen i m³ (1 m³ = 1000 liter). Højere egenvægt pga. selve tanken giver mindre nyttelast.' },
+  reefer: { l: 13.4, w: 2.4, h: 2.5, tare: 15500, maxvaegt: 44000, note: 'Køletrailer — isolerede vægge reducerer det interne lasterum lidt ift. en standardtrailer.' },
+  flatbed: { l: 13.6, w: 2.48, h: 2.8, tare: 12500, maxvaegt: 44000, note: 'Ladtrailer/flatbed — lavere egenvægt end en boxtrailer, ofte brugt til langt/tungt gods uden krav om overdækning.' },
+  container40: { l: 12.19, w: 2.44, h: 2.59, tare: 16000, maxvaegt: 44000, note: '40 fods containerchassis — dimensioner følger selve 40 fods containeren.' }
+};
+
+function vtTrAnvendPreset() {
+  const p = VT_TRAILER_PRESETS[$('#vtTrType').value];
+  if (!p) return;
+  $('#vtTrL').value = p.l; $('#vtTrB').value = p.w; $('#vtTrH').value = p.h;
+  $('#vtTrTare').value = p.tare; $('#vtTrMaxvaegt').value = p.maxvaegt;
 }
 
 async function vtGeocode(sted) {
@@ -4631,6 +4688,49 @@ function beregnVtFr() {
     boks.innerHTML += '<p class="text-xs text-slate-400 mt-3">Din nuværende case-beregning (fanen Beregning) ligger på ' + fmt(casePrKolli) + ' DKK pr. kolli. Dette alternativ er ' + fmt(Math.abs(forskel), 0) + ' % ' + (forskel >= 0 ? 'dyrere' : 'billigere') + ' pr. enhed. Sammenligningen er kun vejledende &mdash; tjek om enhederne reelt svarer til hinanden (kolli vs. palle vs. container).</p>';
     vtFrNote += ' Til sammenligning ligger den åbne case på ' + fmt(casePrKolli) + ' DKK pr. kolli, altså ' + fmt(Math.abs(forskel), 0) + ' % ' + (forskel >= 0 ? 'billigere' : 'dyrere') + ' end alternativet.';
   }
+}
+
+// ---- Trailerkapacitet ----
+let vtTrNote = '';
+
+function beregnVtTr() {
+  const maxV = num($('#vtTrMaxvaegt').value), tare = num($('#vtTrTare').value), last = num($('#vtTrLast').value);
+  const l = num($('#vtTrL').value), b = num($('#vtTrB').value), h = num($('#vtTrH').value), lastVol = num($('#vtTrVolumen').value);
+  const boks = $('#vtTrResultat');
+  if (!(maxV > 0)) { boks.innerHTML = ''; vtTrNote = ''; return; }
+
+  const ledigVaegt = maxV - tare;
+  const restVaegt = ledigVaegt - last;
+  const vaegtUdnyt = ledigVaegt > 0 ? (last / ledigVaegt) * 100 : 0;
+  const trailerVol = l * b * h;
+  const volUdnyt = trailerVol > 0 ? (lastVol / trailerVol) * 100 : 0;
+  const overlaes = restVaegt < 0;
+
+  boks.innerHTML = '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">' +
+    kpi('Ledig lasteevne (vægt)', fmt(ledigVaegt, 0) + ' kg', '') +
+    kpi('Restkapacitet', fmt(restVaegt, 0) + ' kg', overlaes ? 'Overlæs!' : '') +
+    kpi('Vægtudnyttelse', fmt(vaegtUdnyt, 1) + ' %', '') +
+    kpi('Trailervolumen', fmt(trailerVol, 1) + ' m³', '') +
+    kpi('Volumenudnyttelse', fmt(volUdnyt, 1) + ' %', '') +
+    '</div>' +
+    (overlaes
+      ? '<div class="border border-red-800 bg-red-950/20 rounded-xl p-3 text-sm text-slate-300 mt-3">Overlæs! Godset vejer ' + fmt(Math.abs(restVaegt), 0) + ' kg for meget i forhold til den tilladte totalvægt. Det er ulovligt at køre med, og skal enten fordeles på flere ture eller et tungere køretøj.</div>'
+      : '<p class="text-xs text-slate-400 mt-3">Der er ' + fmt(restVaegt, 0) + ' kg vægtkapacitet tilbage (' + fmt(100 - vaegtUdnyt, 1) + ' % ledig). ' +
+        (volUdnyt > vaegtUdnyt ? 'Traileren løber tør for plads (volumen) før vægt — typisk for lette, store varer.' : 'Traileren løber tør for vægt før plads — typisk for tunge, kompakte varer.') + '</p>');
+
+  vtTrNote = 'Trailerkapacitet-værktøjet: ' + fmt(last, 0) + ' kg gods i en ' + $('#vtTrType option:checked').textContent.toLowerCase() +
+    ' giver ' + fmt(vaegtUdnyt, 0) + ' % vægtudnyttelse og ' + fmt(volUdnyt, 0) + ' % volumenudnyttelse.' +
+    (overlaes ? ' OBS: overlæs på ' + fmt(Math.abs(restVaegt), 0) + ' kg.' : '');
+}
+
+function nulstilVtTr() {
+  vtTrNote = '';
+  $('#vtTrType').value = 'box';
+  vtTrAnvendPreset();
+  $('#vtTrLast').value = '0';
+  $('#vtTrVolumen').value = '0';
+  const boks = $('#vtTrResultat');
+  if (boks) boks.innerHTML = '';
 }
 
 bind();
