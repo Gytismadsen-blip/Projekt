@@ -1190,6 +1190,9 @@ function tegnVurdering(r) {
   const fragtrate = r.vareVaerdi > 0 ? r.total / r.vareVaerdi * 100 : 0;
   const vaerdiPrKg = r.faktiskVaegt > 0 ? num(s.vareVaerdi) / r.faktiskVaegt : 0;
   const tillaegAndel = r.total > 0 ? r.tillaegDKK / r.total * 100 : 0;
+  const afstandKm = num(s.afstand);
+  const prKm = afstandKm > 0 ? r.total / afstandKm : 0;
+  const prKolliKm = afstandKm > 0 && r.antalKolli > 0 ? r.total / (r.antalKolli * r.antal * afstandKm) : 0;
 
   $('#noegletal').innerHTML =
     kpi('Pris pr. fragtpligtig kg',
@@ -1206,7 +1209,9 @@ function tegnVurdering(r) {
     kpi('Fragtrate', r.vareVaerdi > 0 ? fmt(fragtrate, 1) + ' %' : '&ndash;', 'Fragt i % af vareværdi') +
     kpi('Vareværdi pr. kg', r.faktiskVaegt > 0 ? fmt(vaerdiPrKg) + ' DKK' : '&ndash;', 'Afgør om luftfragt kan bære sig') +
     kpi('Tillæggenes andel', r.total > 0 ? fmt(tillaegAndel, 1) + ' %' : 'Ikke beregnet', 'Af den samlede fragtregning') +
-    kpi('CO2-udledning', num(s.afstand) > 0 ? fmt(r.co2, 1) + ' kg' : '&ndash;', num(s.afstand) > 0 ? '' : 'Udfyld afstand under E');
+    kpi('Pris pr. km', afstandKm > 0 && r.total > 0 ? fmt(prKm) + ' DKK' : 'Ikke beregnet', afstandKm > 0 ? 'Total ÷ afstand. God til at sammenligne ruter, ikke ruter mod stykgods.' : 'Udfyld afstand under F') +
+    kpi(s.volumenErKapacitet ? 'Pris pr. container-km' : 'Pris pr. kolli-km', afstandKm > 0 && r.antalKolli > 0 && r.total > 0 ? fmt(prKolliKm, 2) + ' DKK' : 'Ikke beregnet', 'Samler pris, mængde og afstand i ét tal — god til at sammenligne transportformer') +
+    kpi('CO2-udledning', num(s.afstand) > 0 ? fmt(r.co2, 1) + ' kg' : '&ndash;', num(s.afstand) > 0 ? '' : 'Udfyld afstand under F');
 
   // --- landed cost ---
   const harVaerdi = r.vareVaerdi > 0;
@@ -1214,6 +1219,13 @@ function tegnVurdering(r) {
   let lc = '<table class="text-sm w-full min-w-[460px]"><tbody class="divide-y divide-[#1e2836]">';
   lc += row('Vareværdi', harVaerdi ? fmt(r.vareVaerdi) + ' DKK' : '<span class="text-slate-500">Ikke oplyst</span>');
   lc += row('Fragtomkostning i alt', fmt(r.total) + ' DKK');
+  const incLC = INCOTERMS[s.incoterm];
+  if (incLC) {
+    lc += row('Hvem betaler fragten, jf. ' + s.incoterm,
+      incLC.hovedtransport === 'køber'
+        ? 'Køber — beløbet ovenfor er en ekstra omkostning oveni vareværdien'
+        : 'Sælger — vareprisen kan allerede indeholde fragten. Tjek casen, så du ikke lægger den til to gange');
+  }
   lc += row('Kapitalbinding under transport' + (harTid && harVaerdi ? ' (' + fmt(num(s.transportTid), 0) + ' dage × ' + fmt(num(s.rente), 1) + ' % p.a.)' : ''),
     harTid && harVaerdi ? fmt(r.kapitalbinding) + ' DKK' : '<span class="text-slate-500">' + (!harVaerdi ? 'Kræver vareværdi' : 'Kræver transporttid') + '</span>');
   lc += harVaerdi
