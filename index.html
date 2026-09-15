@@ -445,7 +445,6 @@
           <option value="container40">40 fods containerchassis</option>
         </select>
       </div>
-      <button id="vtTrHentCase" class="text-sm bg-[#1b2534] hover:bg-[#243044] px-3 py-1.5 rounded-lg">Hent godsets vægt &amp; volumen fra casen</button>
     </div>
     <div class="flex flex-wrap gap-4 items-end">
       <div><div class="text-xs text-slate-400 mb-1">Tilladt totalvægt, vogntog (kg)</div><input id="vtTrMaxvaegt" class="num w-32" value="44000"></div>
@@ -462,6 +461,7 @@
       </div>
       <div><div class="text-xs text-slate-400 mb-1">Godsets volumen (m³)</div><input id="vtTrVolumen" class="num w-32" value="0"></div>
     </div>
+    <p id="vtTrAutoNote" class="text-[11px] text-slate-500 mt-2"></p>
     <div id="vtTrResultat" class="mt-4"></div>
   </div>
 </section>
@@ -1250,6 +1250,7 @@ function tegnResultat() {
   }
 
   tegnVurdering(r);
+  if (typeof vtTrSyncFraCase === 'function') vtTrSyncFraCase();
   tegnFormler(r);
   if (scenarierForCase().length < 2) tegnKonklusion(scenarierForCase());
 }
@@ -4502,14 +4503,10 @@ function initVaerktoejer() {
   $('#vtFrKm').addEventListener('input', beregnVtFr);
 
   $('#vtTrType').addEventListener('change', () => { vtTrAnvendPreset(); beregnVtTr(); });
-  ['vtTrMaxvaegt', 'vtTrTare', 'vtTrLast', 'vtTrL', 'vtTrB', 'vtTrH', 'vtTrVolumen'].forEach(id => $('#' + id).addEventListener('input', beregnVtTr));
-  $('#vtTrHentCase').addEventListener('click', () => {
-    const r = beregn();
-    $('#vtTrLast').value = String(Math.round(r.faktiskVaegt));
-    $('#vtTrVolumen').value = String(Math.round(r.volumen * 1000) / 1000);
-    beregnVtTr();
-  });
-  beregnVtTr();
+  ['vtTrMaxvaegt', 'vtTrTare', 'vtTrL', 'vtTrB', 'vtTrH'].forEach(id => $('#' + id).addEventListener('input', beregnVtTr));
+  $('#vtTrLast').addEventListener('input', () => { vtTrLastManuel = true; vtTrOpdaterNote(); beregnVtTr(); });
+  $('#vtTrVolumen').addEventListener('input', () => { vtTrVolManuel = true; vtTrOpdaterNote(); beregnVtTr(); });
+  vtTrSyncFraCase();
 }
 
 const VT_TRAILER_PRESETS = {
@@ -4692,6 +4689,24 @@ function beregnVtFr() {
 
 // ---- Trailerkapacitet ----
 let vtTrNote = '';
+let vtTrLastManuel = false;
+let vtTrVolManuel = false;
+
+function vtTrOpdaterNote() {
+  const auto = !vtTrLastManuel && !vtTrVolManuel;
+  $('#vtTrAutoNote').textContent = auto
+    ? 'Vægt og volumen er hentet automatisk fra den åbne case. Skriv selv i felterne for at teste et andet scenarie.'
+    : 'Du har selv rettet vægt og/eller volumen — de følger ikke længere casen automatisk. Ryd alt for at nulstille.';
+}
+
+function vtTrSyncFraCase() {
+  if (!$('#vtTrLast')) return;
+  const r = beregn();
+  if (!vtTrLastManuel) $('#vtTrLast').value = String(Math.round(r.faktiskVaegt));
+  if (!vtTrVolManuel) $('#vtTrVolumen').value = String(Math.round(r.volumen * 1000) / 1000);
+  vtTrOpdaterNote();
+  beregnVtTr();
+}
 
 function beregnVtTr() {
   const maxV = num($('#vtTrMaxvaegt').value), tare = num($('#vtTrTare').value), last = num($('#vtTrLast').value);
@@ -4725,12 +4740,13 @@ function beregnVtTr() {
 
 function nulstilVtTr() {
   vtTrNote = '';
+  vtTrLastManuel = false;
+  vtTrVolManuel = false;
   $('#vtTrType').value = 'box';
   vtTrAnvendPreset();
-  $('#vtTrLast').value = '0';
-  $('#vtTrVolumen').value = '0';
   const boks = $('#vtTrResultat');
   if (boks) boks.innerHTML = '';
+  vtTrSyncFraCase();
 }
 
 bind();
