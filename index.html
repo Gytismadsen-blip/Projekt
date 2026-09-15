@@ -423,7 +423,14 @@
     <div id="vtHvResultat" class="mt-4"></div>
   </div>
   <div id="vtool-fragtpr" class="card p-4 vtoolpanel hidden">
-    <p class="text-sm text-slate-400">Bygges som næste skridt.</p>
+    <h2 class="font-semibold mb-1">Fragtomkostning pr. enhed/km</h2>
+    <p class="text-xs text-slate-400 mb-3">Hurtig lommeregner til et alternativt tilbud eller en anden rute &mdash; uden at bygge en hel case op. Godt til at sammenligne et samlet tilbudsbeløb med din nuværende case-beregning på fanen Beregning.</p>
+    <div class="flex flex-wrap gap-4 items-end">
+      <div><div class="text-xs text-slate-400 mb-1">Total fragtomk. (kr)</div><input id="vtFrCost" class="num w-32" value="0"></div>
+      <div><div class="text-xs text-slate-400 mb-1">Antal enheder/paller</div><input id="vtFrUnits" class="num w-28" value="0"></div>
+      <div><div class="text-xs text-slate-400 mb-1">Afstand (km)</div><input id="vtFrKm" class="num w-28" value="0"></div>
+    </div>
+    <div id="vtFrResultat" class="mt-4"></div>
   </div>
   <div id="vtool-trailer" class="card p-4 vtoolpanel hidden">
     <p class="text-sm text-slate-400">Bygges som næste skridt.</p>
@@ -1284,6 +1291,7 @@ function tegnVurdering(r) {
 
   if (typeof vtRuteNote === 'string' && vtRuteNote) add('info', vtRuteNote);
   if (typeof vtHvNote === 'string' && vtHvNote) add('info', vtHvNote);
+  if (typeof vtFrNote === 'string' && vtFrNote) add('info', vtFrNote);
 
   // valutakontrol: en post i fremmed valuta uden kurs bliver stille talt som 0 kr.
   const brugteVal = [state.valutaFragt].concat(state.linjer.filter(l => l.aktiv && l.type !== 'pct').map(l => l.valuta));
@@ -4431,6 +4439,13 @@ function nulstilVaerktoejer() {
   if (hvMaksDag) hvMaksDag.value = '9';
   if (hvBoks) hvBoks.innerHTML = '';
   opdaterVtHvHint();
+
+  vtFrNote = '';
+  const frCost = $('#vtFrCost'), frUnits = $('#vtFrUnits'), frKm = $('#vtFrKm'), frBoks = $('#vtFrResultat');
+  if (frCost) frCost.value = '0';
+  if (frUnits) frUnits.value = '0';
+  if (frKm) frKm.value = '0';
+  if (frBoks) frBoks.innerHTML = '';
 }
 
 function initVaerktoejer() {
@@ -4449,6 +4464,10 @@ function initVaerktoejer() {
 
   $('#vtHvKoeretid').addEventListener('input', beregnVtHv);
   $('#vtHvMaksDag').addEventListener('input', beregnVtHv);
+
+  $('#vtFrCost').addEventListener('input', beregnVtFr);
+  $('#vtFrUnits').addEventListener('input', beregnVtFr);
+  $('#vtFrKm').addEventListener('input', beregnVtFr);
 }
 
 async function vtGeocode(sted) {
@@ -4582,6 +4601,36 @@ function beregnVtHv() {
     (transportTidCase > 0 && transportTidCase !== dage
       ? ' Casen angiver ' + fmt(transportTidCase, 0) + ' dage under punkt F som transporttid — tjek om det stemmer med de ' + dage + ' køredag(e) her, eller om forskellen skyldes fx om- og omladning.'
       : '');
+}
+
+// ---- Fragtomkostning pr. enhed/km ----
+let vtFrNote = '';
+
+function beregnVtFr() {
+  const cost = num($('#vtFrCost').value), units = num($('#vtFrUnits').value), km = num($('#vtFrKm').value);
+  const boks = $('#vtFrResultat');
+  if (!(cost > 0) || !(units > 0)) { boks.innerHTML = ''; vtFrNote = ''; return; }
+
+  const prEnhed = cost / units;
+  const prKm = km > 0 ? cost / km : 0;
+  const prEnhedKm = km > 0 ? cost / (units * km) : 0;
+
+  boks.innerHTML = '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">' +
+    kpi('Pris pr. enhed', fmt(prEnhed) + ' DKK', '') +
+    kpi('Pris pr. km', km > 0 ? fmt(prKm) + ' DKK' : 'Ikke beregnet', km > 0 ? '' : 'Udfyld afstand') +
+    kpi('Pris pr. enhed-km', km > 0 ? fmt(prEnhedKm, 3) + ' DKK' : 'Ikke beregnet', '') +
+    '</div>';
+
+  vtFrNote = 'Fragtomkostning-værktøjet: et alternativt tilbud på ' + fmt(cost) + ' DKK for ' + fmt(units, 0) + ' enheder' +
+    (km > 0 ? ' over ' + fmt(km, 0) + ' km' : '') + ' svarer til ' + fmt(prEnhed) + ' DKK pr. enhed' + (km > 0 ? ' og ' + fmt(prKm) + ' DKK pr. km' : '') + '.';
+
+  const r = beregn();
+  if (r.total > 0 && r.antalKolli > 0) {
+    const casePrKolli = r.total / (r.antalKolli * r.antal);
+    const forskel = (prEnhed / casePrKolli - 1) * 100;
+    boks.innerHTML += '<p class="text-xs text-slate-400 mt-3">Din nuværende case-beregning (fanen Beregning) ligger på ' + fmt(casePrKolli) + ' DKK pr. kolli. Dette alternativ er ' + fmt(Math.abs(forskel), 0) + ' % ' + (forskel >= 0 ? 'dyrere' : 'billigere') + ' pr. enhed. Sammenligningen er kun vejledende &mdash; tjek om enhederne reelt svarer til hinanden (kolli vs. palle vs. container).</p>';
+    vtFrNote += ' Til sammenligning ligger den åbne case på ' + fmt(casePrKolli) + ' DKK pr. kolli, altså ' + fmt(Math.abs(forskel), 0) + ' % ' + (forskel >= 0 ? 'billigere' : 'dyrere') + ' end alternativet.';
+  }
 }
 
 bind();
