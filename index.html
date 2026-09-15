@@ -434,7 +434,7 @@
   </div>
   <div id="vtool-trailer" class="card p-4 vtoolpanel hidden">
     <h2 class="font-semibold mb-1">Lastbil- &amp; trailerkapacitet</h2>
-    <p class="text-xs text-slate-400 mb-3">Om godset er inden for køretøjets vægt- og volumenkapacitet. Vejledende &mdash; tager ikke højde for akseltryk, vægtfordeling m.m. 44.000 kg er kun ét eksempel på en dansk totalvægt &mdash; det rigtige tal afhænger af antal aksler og afstanden mellem dem (fra 28.000 til 56.000 kg, se tabellen under Teori). Tjek din konkrete køretøjskombinations registreringsattest.</p>
+    <p class="text-xs text-slate-400 mb-3">Om godset er inden for køretøjets vægt- og volumenkapacitet. Vejledende &mdash; tager ikke højde for akseltryk, vægtfordeling m.m. 47.000 kg (standard 5-akslet vogntog) er kun ét eksempel på en dansk totalvægt &mdash; det rigtige tal afhænger af antal aksler og afstanden mellem dem (fra 20.000 til 58.000 kg, se tabellen under Teori). Tjek din konkrete køretøjskombinations registreringsattest.</p>
     <div class="flex flex-wrap gap-4 items-end mb-3">
       <div><div class="text-xs text-slate-400 mb-1">Trailertype</div>
         <select id="vtTrType" class="text-sm">
@@ -447,7 +447,7 @@
       </div>
     </div>
     <div class="flex flex-wrap gap-4 items-end">
-      <div><div class="text-xs text-slate-400 mb-1">Tilladt totalvægt, vogntog (kg)</div><input id="vtTrMaxvaegt" class="num w-32" value="44000"></div>
+      <div><div class="text-xs text-slate-400 mb-1">Tilladt totalvægt, vogntog (kg)</div><input id="vtTrMaxvaegt" class="num w-32" value="47000"></div>
       <div><div class="text-xs text-slate-400 mb-1">Køretøjets egenvægt (kg)</div><input id="vtTrTare" class="num w-32" value="14500"></div>
       <div><div class="text-xs text-slate-400 mb-1">Godsets vægt (kg)</div><input id="vtTrLast" class="num w-32" value="0"></div>
     </div>
@@ -595,18 +595,29 @@
 
   <div class="card p-4">
     <h2 class="font-semibold mb-2">Danske total- og vogntogsvægte</h2>
-    <p class="text-sm text-slate-300 mb-3">Der findes ikke ét dansk vægtmaksimum for lastbiler &mdash; grænsen afhænger af antal aksler og afstanden mellem dem. 44.000 kg (brugt som standard i Trailerkapacitet-værktøjet) er ét almindeligt eksempel, ikke loftet.</p>
-    <div class="scroll"><table class="text-sm w-full min-w-[420px]">
-      <thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Vogntog</th><th class="text-right">Tilladt totalvægt</th></tr></thead>
+    <p class="text-sm text-slate-300 mb-3">Der findes ikke ét dansk vægtmaksimum for lastbiler &mdash; grænsen afhænger af antal aksler, om det er køretøjet alene eller et vogntog, og afstanden mellem akslerne. 47.000 kg (brugt som standard i Trailerkapacitet-værktøjet) er grænsen for et almindeligt 5-akslet vogntog, ikke et generelt loft.</p>
+    <div class="scroll"><table class="text-sm w-full min-w-[460px]">
+      <thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Vogntog (lastbil + påhængskøretøj)</th><th class="text-right">Tilladt totalvægt</th></tr></thead>
       <tbody class="divide-y divide-[#1e2836]">
-        <tr><td>3 aksler</td><td class="num">28.000 kg</td></tr>
-        <tr><td>4 aksler</td><td class="num">32.000&ndash;38.000 kg</td></tr>
-        <tr><td>5 aksler</td><td class="num">42.000&ndash;44.000 kg</td></tr>
-        <tr><td>6 aksler</td><td class="num">45.000&ndash;50.000 kg</td></tr>
-        <tr><td>7 aksler</td><td class="num">54.000&ndash;56.000 kg</td></tr>
+        <tr><td>5 aksler</td><td class="num">47.000 kg</td></tr>
+        <tr><td>6 aksler (lastbil med 3 aksler)</td><td class="num">53.000 kg</td></tr>
+        <tr><td>6 aksler (lastbil med 4 aksler)</td><td class="num">52.000 kg</td></tr>
+        <tr><td>6 aksler, andre kombinationer</td><td class="num">50.000 kg</td></tr>
+        <tr><td>7 eller flere aksler</td><td class="num">58.000 kg</td></tr>
+        <tr><td>Andre vogntog</td><td class="num">44.000 kg</td></tr>
       </tbody>
     </table></div>
-    <p class="text-xs text-slate-400 mt-2">Præcise grænser kræver mindste-afstande mellem akslerne (typisk 1,3&ndash;4 m afhængigt af konfiguration) &mdash; se ITD's vægtark for alle kombinationer. Politiets tolerance ved kontrol: tiltale rejses ved akseltryk over 7,0 % (eller &gt;500 kg), og totalvægt over 6,0 % (eller &gt;2.000 kg).</p>
+    <p class="text-xs text-slate-300 mt-3 mb-1">Lastbilen alene (uden påhængskøretøj), efter antal aksler:</p>
+    <div class="scroll"><table class="text-sm w-full min-w-[420px]">
+      <thead class="text-slate-400 text-xs uppercase"><tr><th class="text-left">Aksler</th><th class="text-right">Tilladt totalvægt</th></tr></thead>
+      <tbody class="divide-y divide-[#1e2836]">
+        <tr><td>2</td><td class="num">20.000 kg</td></tr>
+        <tr><td>3</td><td class="num">24.000&ndash;28.000 kg</td></tr>
+        <tr><td>4</td><td class="num">29.500&ndash;36.000 kg</td></tr>
+        <tr><td>5 eller flere</td><td class="num">32.000&ndash;42.000 kg</td></tr>
+      </tbody>
+    </table></div>
+    <p class="text-xs text-slate-400 mt-2">De højeste tal i hver kategori kræver en minimumsafstand mellem forreste og bageste aksel (typisk 5&ndash;7,4 m for lastbilen alene, 2,5&ndash;4 m mellem bilens og påhængets aksler for vogntog, stigende med totalvægten). Reglerne skærpes yderligere ved store afvigelser fra minimumsafstandene. Politiets tolerance ved kontrol (fra den tidligere bekendtgørelse, principielt uændret): tiltale rejses ved akseltryk over 7,0 % (eller &gt;500 kg), og totalvægt over 6,0 % (eller &gt;2.000 kg).</p>
   </div>
 
   <div class="card p-4">
@@ -665,7 +676,7 @@
       <li>EU-forordning (EF) 561/2006 om køre- og hviletid, samt undervisningsnoterne "Landevejstransport (teori)", 3. semester. Grundlag for Køre- &amp; hviletid-værktøjet og uddybningen i Teori.</li>
       <li>CMR-konventionen (vej), Hague-Visby-reglerne (sø), Montreal-konventionen 1999 (luft) og CIM/COTIF-konventionen (bane), via undervisningsnoterne "Strukturen på Transportmarkedet (teori)". Grundlag for ansvarstabellen.</li>
       <li>ICAO's ni luftfartsfriheder ("Freedoms of the Air"), via undervisningsnoterne til Luftfragt.</li>
-      <li>ITD (International Transport Danmark): <i>Total- og vogntogsvægte i DK</i>, maj 2018. Grundlag for de danske vægtgrænser.</li>
+      <li>Færdselsstyrelsen: <i>Bekendtgørelse om køretøjers største bredde, længde, højde, vægt og akseltryk</i>, BEK nr. 1447 af 27/11/2025, §21 (i kraft fra 1. januar 2026). Grundlag for de danske vægtgrænser. Retter et tidligere, forældet tal fra en brancheopgørelse fra 2018.</li>
       <li>OECD/International Transport Forum: <i>ITF Transport Outlook</i>, 2019, og undervisningsnoterne "Decarbonising the Movement of Freight". Grundlag for bæredygtighedsafsnittet.</li>
       <li>Casene Air Birgers Møbler, Sea Birgers Møbler og DanMeat er undervisningsmateriale fra faget Distribution, 3. semester, og bruges som kontrolberegninger med kendt facit.</li>
     </ul>
@@ -4619,11 +4630,11 @@ function initVaerktoejer() {
 }
 
 const VT_TRAILER_PRESETS = {
-  box: { l: 13.6, w: 2.48, h: 2.7, tare: 14500, maxvaegt: 44000, note: 'Standard gardin-/boxtrailer — almindeligt stykgods på paller.' },
-  tank: { l: 13.6, w: 2.5, h: 2.6, tare: 17000, maxvaegt: 44000, note: 'Tanktrailer — angiv godsvolumen i m³ (1 m³ = 1000 liter). Højere egenvægt pga. selve tanken giver mindre nyttelast.' },
-  reefer: { l: 13.4, w: 2.4, h: 2.5, tare: 15500, maxvaegt: 44000, note: 'Køletrailer — isolerede vægge reducerer det interne lasterum lidt ift. en standardtrailer.' },
-  flatbed: { l: 13.6, w: 2.48, h: 2.8, tare: 12500, maxvaegt: 44000, note: 'Ladtrailer/flatbed — lavere egenvægt end en boxtrailer, ofte brugt til langt/tungt gods uden krav om overdækning.' },
-  container40: { l: 12.19, w: 2.44, h: 2.59, tare: 16000, maxvaegt: 44000, note: '40 fods containerchassis — dimensioner følger selve 40 fods containeren.' }
+  box: { l: 13.6, w: 2.48, h: 2.7, tare: 14500, maxvaegt: 47000, note: 'Standard gardin-/boxtrailer — almindeligt stykgods på paller. 47.000 kg er den danske grænse for et 5-akslet vogntog (lastbil + registreringspligtigt påhængskøretøj), jf. dimensionsbekendtgørelsen §21.' },
+  tank: { l: 13.6, w: 2.5, h: 2.6, tare: 17000, maxvaegt: 47000, note: 'Tanktrailer — angiv godsvolumen i m³ (1 m³ = 1000 liter). Højere egenvægt pga. selve tanken giver mindre nyttelast.' },
+  reefer: { l: 13.4, w: 2.4, h: 2.5, tare: 15500, maxvaegt: 47000, note: 'Køletrailer — isolerede vægge reducerer det interne lasterum lidt ift. en standardtrailer.' },
+  flatbed: { l: 13.6, w: 2.48, h: 2.8, tare: 12500, maxvaegt: 47000, note: 'Ladtrailer/flatbed — lavere egenvægt end en boxtrailer, ofte brugt til langt/tungt gods uden krav om overdækning.' },
+  container40: { l: 12.19, w: 2.44, h: 2.59, tare: 16000, maxvaegt: 47000, note: '40 fods containerchassis — dimensioner følger selve 40 fods containeren.' }
 };
 
 function vtTrAnvendPreset() {
@@ -4740,7 +4751,7 @@ function beregnVtHv() {
   while (resterer > 0) {
     dage++;
     const dagensKoersel = Math.min(resterer, maksDag);
-    const pauserIDag = Math.floor(dagensKoersel / 4.5);
+    const pauserIDag = dagensKoersel > 0 ? Math.max(0, Math.ceil(dagensKoersel / 4.5 - 1e-9) - 1) : 0;
     pauseMinIAlt += pauserIDag * 45;
     resterer -= dagensKoersel;
   }
@@ -4748,16 +4759,20 @@ function beregnVtHv() {
   const rejsetidIAlt = totalTimer + pauseMinIAlt / 60;
   const antalPauser = Math.round(pauseMinIAlt / 45);
 
+  let maksDagAdvarsel = '';
+  if (maksDag > 10) maksDagAdvarsel = '<div class="border border-red-800 bg-red-950/20 rounded-xl p-3 text-sm text-slate-300 mt-3">' + fmt(maksDag, 1) + ' timers køretid på én dag er ikke lovligt under nogen omstændighed. Den absolutte grænse er 10 timer, og kun 2 gange om ugen.</div>';
+  else if (maksDag > 9) maksDagAdvarsel = '<p class="text-xs text-amber-300 mt-3">' + fmt(maksDag, 1) + ' timer er kun tilladt som "forlænget køretid" &mdash; det må højst bruges 2 gange om ugen. Normal daglig grænse er 9 timer.</p>';
+
   boks.innerHTML = '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">' +
     kpi('Antal køredage', dage, '') +
     kpi('Lovpligtige pauser (45 min)', antalPauser, '') +
     kpi('Samlet pausetid', fmt(pauseMinIAlt, 0) + ' min', '') +
-    kpi('Rejsetid inkl. pauser', fmt(rejsetidIAlt, 1) + ' t', '') +
+    kpi('Aktiv tid inkl. pauser', fmt(rejsetidIAlt, 1) + ' t', 'Kun kørsel og korte pauser, ikke døgnhvile mellem dage') +
     kpi('Overnatninger (min. 11 t hvile)', overnatninger, '') +
     '</div>' +
     '<p class="text-xs text-slate-400 mt-3">' + (dage > 1
-      ? 'Turen kan ikke køres på én dag inden for reglerne. Der skal ' + overnatninger + ' overnatning(er) med mindst 11 timers sammenhængende hviletid, samt ' + antalPauser + ' pause(r) af 45 minutter undervejs (efter hver 4½ times kørsel).'
-      : 'Turen kan gennemføres på én dag. Der skal dog holdes ' + antalPauser + ' pause(r) af 45 minutter efter hver 4½ times sammenhængende kørsel — reglerne gælder, uanset hvor kort eller lang turen er.') + '</p>';
+      ? 'Turen kan ikke køres på én dag inden for reglerne. Der skal ' + overnatninger + ' overnatning(er) med mindst 11 timers sammenhængende hviletid oveni den aktive tid, samt ' + antalPauser + ' pause(r) af 45 minutter undervejs (efter hver 4½ times kørsel).'
+      : 'Turen kan gennemføres på én dag. Der skal dog holdes ' + antalPauser + ' pause(r) af 45 minutter efter hver 4½ times sammenhængende kørsel — reglerne gælder, uanset hvor kort eller lang turen er.') + '</p>' + maksDagAdvarsel;
 
   const transportTidCase = num(state.transportTid);
   vtHvNote = 'Køre- & hviletid-værktøjet: ' + fmt(totalTimer, 1) + ' t køretid kræver ' + dage + ' køredag(e) og ' + antalPauser + ' pause(r) af 45 min, jf. EU-forordning 561/2006 (forenklet).' +
@@ -4830,23 +4845,28 @@ function beregnVtTr() {
   const trailerVol = l * b * h;
   const volUdnyt = trailerVol > 0 ? (lastVol / trailerVol) * 100 : 0;
   const overlaes = restVaegt < 0;
+  const restVol = trailerVol - lastVol;
+  const volOverlaes = restVol < 0;
+
+  let advarsler = '';
+  if (overlaes) advarsler += '<div class="border border-red-800 bg-red-950/20 rounded-xl p-3 text-sm text-slate-300 mt-3">Overvægt: godset vejer ' + fmt(Math.abs(restVaegt), 0) + ' kg for meget i forhold til den tilladte totalvægt. Det er ulovligt at køre med, og skal enten fordeles på flere ture eller et tungere køretøj.</div>';
+  if (volOverlaes) advarsler += '<div class="border border-red-800 bg-red-950/20 rounded-xl p-3 text-sm text-slate-300 mt-3">For stort volumen: godset fylder ' + fmt(Math.abs(restVol), 1) + ' m³ mere end traileren har plads til. Godset kan ikke være i traileren og skal fordeles på flere ture eller en større løsning.</div>';
+  if (!overlaes && !volOverlaes) advarsler = '<p class="text-xs text-slate-400 mt-3">Der er ' + fmt(restVaegt, 0) + ' kg vægtkapacitet tilbage (' + fmt(100 - vaegtUdnyt, 1) + ' % ledig). ' +
+    (volUdnyt > vaegtUdnyt ? 'Traileren løber tør for plads (volumen) før vægt — typisk for lette, store varer.' : 'Traileren løber tør for vægt før plads — typisk for tunge, kompakte varer.') + '</p>';
 
   boks.innerHTML = '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">' +
     kpi('Ledig lasteevne (vægt)', fmt(ledigVaegt, 0) + ' kg', '') +
     kpi('Restkapacitet', fmt(restVaegt, 0) + ' kg', overlaes ? 'Overlæs!' : '') +
     kpi('Vægtudnyttelse', fmt(vaegtUdnyt, 1) + ' %', '') +
     kpi('Trailervolumen', fmt(trailerVol, 1) + ' m³', '') +
-    kpi('Volumenudnyttelse', fmt(volUdnyt, 1) + ' %', '') +
-    '</div>' +
-    (overlaes
-      ? '<div class="border border-red-800 bg-red-950/20 rounded-xl p-3 text-sm text-slate-300 mt-3">Overlæs! Godset vejer ' + fmt(Math.abs(restVaegt), 0) + ' kg for meget i forhold til den tilladte totalvægt. Det er ulovligt at køre med, og skal enten fordeles på flere ture eller et tungere køretøj.</div>'
-      : '<p class="text-xs text-slate-400 mt-3">Der er ' + fmt(restVaegt, 0) + ' kg vægtkapacitet tilbage (' + fmt(100 - vaegtUdnyt, 1) + ' % ledig). ' +
-        (volUdnyt > vaegtUdnyt ? 'Traileren løber tør for plads (volumen) før vægt — typisk for lette, store varer.' : 'Traileren løber tør for vægt før plads — typisk for tunge, kompakte varer.') + '</p>');
+    kpi('Volumenudnyttelse', fmt(volUdnyt, 1) + ' %', volOverlaes ? 'For stort volumen!' : '') +
+    '</div>' + advarsler;
 
   vtTrNote = vtTrBesoegt
     ? 'Trailerkapacitet-værktøjet: ' + fmt(last, 0) + ' kg gods i en ' + $('#vtTrType option:checked').textContent.toLowerCase() +
       ' giver ' + fmt(vaegtUdnyt, 0) + ' % vægtudnyttelse og ' + fmt(volUdnyt, 0) + ' % volumenudnyttelse.' +
-      (overlaes ? ' OBS: overlæs på ' + fmt(Math.abs(restVaegt), 0) + ' kg.' : '')
+      (overlaes ? ' OBS: overvægt på ' + fmt(Math.abs(restVaegt), 0) + ' kg.' : '') +
+      (volOverlaes ? ' OBS: for stort volumen med ' + fmt(Math.abs(restVol), 1) + ' m³.' : '')
     : '';
 }
 
