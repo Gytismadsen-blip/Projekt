@@ -110,7 +110,7 @@ function ok(navn, cond, info) {
      d.querySelector('.card .big .n').textContent.trim() === '5', d.querySelector('.card .big .n').textContent);
   skriv(d.querySelector('#f0-kmPris'), '8,5');
   ok('Skift kilometerpris med komma virker', /12\.365|12\.[0-9]{3},/.test(d.querySelector('.card').textContent) && T.parseTal('8,5') === 8.5);
-  const gem = w.localStorage.getItem('turberegner.v1');
+  const gem = w.localStorage.getItem('turberegner.v2');
   ok('Ændringer gemmes', gem && JSON.parse(gem)[0].tonnage === 120);
 
   // vælg Euro 4 på kort 2 → Maut-sats skifter, uden at ændre kode
@@ -137,6 +137,36 @@ function ok(navn, cond, info) {
   // nulstil
   d.getElementById('reset').click();
   ok('Nulstil giver 3 kort og Milano igen', d.querySelectorAll('.card').length === 3 && /49\.855,88/.test(d.querySelector('.card').textContent));
+
+
+  // ---- NY SIDE: faner, kort-data og konklusion ----
+  {
+    const dom2 = await JSDOM.fromFile(path.join(__dirname, 'index.html'), { runScripts: 'dangerously', url: 'file:///' + path.join(__dirname, 'index.html').split(String.fromCharCode(92)).join('/'), pretendToBeVisual: true, resources: 'usable' });
+    await new Promise(r => setTimeout(r, 400));
+    const w2 = dom2.window, d2 = w2.document, UI = w2.TurberegnerUI;
+    ok('UI-objektet findes', !!UI);
+    ok('rutedata er indlæst med Milano og Budapest', !!(w2.RUTEDATA && w2.RUTEDATA.ruter.milano && w2.RUTEDATA.ruter.budapest));
+    ok('Milano-ruten har en rigtig linje (over 100 punkter)', w2.RUTEDATA.ruter.milano.linje.length > 100);
+    ok('rutepanel viser 2 ruter', d2.querySelectorAll('#rutepanel .rute').length === 2, d2.querySelectorAll('#rutepanel .rute').length);
+    ok('rutepanel viser kort-km og case-km', /1\.456 km/.test(d2.getElementById('rutepanel').textContent) && /1\.452 km/.test(d2.getElementById('rutepanel').textContent));
+    ok('kun Rute-fanen er synlig ved start', !d2.getElementById('fane-rute').hidden && d2.getElementById('fane-konklusion').hidden);
+    UI.visFane('konklusion');
+    ok('Konklusion-fanen vises', !d2.getElementById('fane-konklusion').hidden && d2.getElementById('fane-rute').hidden);
+    const k = UI.konklusionTekst();
+    ok('konklusion: Milano 4 læs og 49.855,88', /Det giver 4 vogntog/.test(k) && /49\.855,88/.test(k));
+    ok('konklusion: anbefaler 5 vogntog og 62.319,85 til Milano', /Anbefaling: regn med 5 vogntog og 62\.319,85/.test(k), k.slice(0, 400));
+    ok('konklusion: anbefaler Budapest lastbil', /Anbefaling: Budapest, lastbil/.test(k));
+    ok('konklusion: Euro 4 sparer 938,25 kr', /938,25/.test(k));
+    ok('konklusion: nævner 18 af 258', /18 Euro 4-trækkere af 258/.test(k));
+    ok('konklusion: stuvning 3 stakke Milano og 2 stakke Budapest', /3 stakke/.test(k) && /2 stakke/.test(k));
+    ok('konklusion: uden "Jeg"', !/\bJeg\b/.test(k));
+    // konklusionen følger tallene
+    const kort2 = d2.querySelector('#f1-tonnage'); kort2.value = '100'; kort2.dispatchEvent(new w2.Event('input', { bubbles: true }));
+    ok('konklusion opdaterer når tal ændres (100 t Budapest giver 4 vogntog)', /Godset er 100,00 ton/.test(UI.konklusionTekst()) && /Det giver 4 vogntog/.test(UI.konklusionTekst().split('Budapest, lastbil')[1] || ''));
+    ok('sammenlign-stolper findes', d2.querySelectorAll('#bars .barrow').length === 3);
+    ok('euro-tabel viser -80 % partikler', /−80 %/.test(d2.getElementById('euro').textContent));
+    ok('ordbog og antagelser findes', d2.querySelectorAll('#ant li').length >= 8);
+  }
 
   console.log(fejl ? '\n' + fejl + ' FEJL' : '\nAlle tests bestået');
   process.exit(fejl ? 1 : 0);
