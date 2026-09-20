@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turberegner</title>
+<style>
+:root{
+  --bg:#e8ecef; --panel:#ffffff; --ink:#15212c; --muted:#586878; --line:#cbd5dd;
+  --accent:#1d5b88; --accent-soft:#dbe8f1; --warn:#a85f00; --warn-soft:#fbeed7;
+  --bad:#b3261e; --bad-soft:#f9dedb; --ok:#23744a; --ok-soft:#dcf0e5;
+  --tractor:#55636f; --trailer:#8f9ca7; --extra:#d59a2b; --payload:#1d5b88;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101820; --panel:#18232d; --ink:#e6edf3; --muted:#9aabba; --line:#2b3a47;
+    --accent:#6db3e3; --accent-soft:#1e3546; --warn:#f0b35a; --warn-soft:#3a2c12;
+    --bad:#ff8a80; --bad-soft:#42201d; --ok:#6fd39c; --ok-soft:#173526;
+    --tractor:#7d8b97; --trailer:#5d6b77; --extra:#d59a2b; --payload:#6db3e3;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+h1{margin:0;font-size:1.9rem;letter-spacing:-.01em}
+.lead{margin:4px 0 0;color:var(--muted);max-width:60ch}
+h2{font-size:1.15rem;margin:0 0 10px}
+h3{font-size:1rem;margin:16px 0 8px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  padding:8px 14px;border-radius:6px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{
+  outline:3px solid var(--accent);outline-offset:1px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+.cmp{overflow-x:auto;margin-bottom:20px}
+input[aria-invalid="true"]{border-color:var(--bad);background:var(--bad-soft)}
+.scrollhint{display:none;margin:6px 0 0;font-size:.82rem;color:var(--muted)}
+@media (max-width:700px){.scrollhint{display:block}}
+table{border-collapse:collapse;width:100%}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+th:first-child,td:first-child{text-align:left}
+thead th{font-weight:600;color:var(--muted);font-size:.9rem}
+td.best{background:var(--ok-soft);font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:16px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+.cardhead{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.cardhead input.name{flex:1;font-size:1.15rem;font-weight:600;border:0;border-bottom:2px solid var(--line);
+  background:transparent;color:var(--ink);padding:4px 0}
+fieldset{border:0;padding:0;margin:14px 0 0}
+legend{font-weight:600;padding:0;margin-bottom:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+label{display:block;font-size:.9rem;color:var(--muted)}
+label span.h{display:block;font-size:.78rem;opacity:.9}
+input[type=text],select,textarea{width:100%;font:inherit;padding:7px 8px;border:1px solid var(--line);
+  border-radius:5px;background:var(--panel);color:var(--ink);margin-top:2px}
+input[type=text]{text-align:right}
+textarea{text-align:left;min-height:64px}
+.result{margin-top:16px;border-top:2px solid var(--ink);padding-top:12px}
+.big{display:flex;flex-wrap:wrap;gap:8px 24px;margin-bottom:10px}
+.big div{min-width:120px}
+.big .n{font-size:1.9rem;font-weight:700;line-height:1.1}
+.big .l{font-size:.85rem;color:var(--muted)}
+.bar{display:flex;height:34px;border-radius:5px;overflow:hidden;border:1px solid var(--line);margin:8px 0 6px}
+.bar div{height:100%}
+.bar .t1{background:var(--tractor)}.bar .t2{background:var(--trailer)}.bar .t3{background:var(--extra)}.bar .t4{background:var(--payload)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.82rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+.msgs{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.msgs li{padding:8px 10px;border-radius:5px;font-size:.92rem;border-left:4px solid}
+.msgs .fejl{background:var(--bad-soft);border-color:var(--bad)}
+.msgs .advarsel{background:var(--warn-soft);border-color:var(--warn)}
+.msgs .info{background:var(--accent-soft);border-color:var(--accent)}
+.msgs .ok{background:var(--ok-soft);border-color:var(--ok)}
+details{margin-top:12px}
+summary{cursor:pointer;font-weight:600}
+.steps td:nth-child(2){text-align:left;color:var(--muted);font-size:.88rem}
+.steps td:last-child{font-weight:600;white-space:nowrap}
+.bottom{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px;margin-top:20px}
+ol.ant,dl.gl{margin:0;padding-left:20px}
+dl.gl{padding:0}dl.gl dt{font-weight:600;margin-top:8px}dl.gl dd{margin:0;color:var(--muted)}
+.foot{margin-top:24px;color:var(--muted);font-size:.85rem}
+@media (max-width:480px){.grid{grid-template-columns:1fr}}
+@media print{.actions,button{display:none}body{background:#fff}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Turberegner</h1>
+    <p class="lead">Hvor mange vogntog skal der til, og hvad koster turen? Skift tallene, og alle mellemregninger følger med. Milano og Budapest ligger klar som eksempler fra casen Road Topstans.</p>
+  </div>
+  <div class="actions">
+    <button class="primary" id="add-lastbil">Ny rute (lastbil)</button>
+    <button id="add-container">Ny rute (container og pram)</button>
+    <button id="reset">Nulstil til eksempler</button>
+  </div>
+</header>
+
+<section class="panel cmp" aria-labelledby="cmp-h">
+  <h2 id="cmp-h">Sammenligning</h2>
+  <div id="cmp"></div>
+  <p class="scrollhint">Træk tabellen til siden for at se hele.</p>
+</section>
+
+<section class="cards" id="cards" aria-label="Ruter"></section>
+
+<div class="bottom">
+  <section class="panel">
+    <h2>Antagelser</h2>
+    <p style="margin-top:0;color:var(--muted)">Det her regner værktøjet med, fordi casen ikke svarer på det.</p>
+    <ol class="ant" id="ant"></ol>
+  </section>
+  <section class="panel">
+    <h2>Hvad betyder ordene</h2>
+    <dl class="gl">
+      <dt>Egenvægt</dt><dd>Hvad trækkeren eller traileren vejer, når den er tom.</dd>
+      <dt>Nyttelast</dt><dd>Det godset må veje. Vægtgrænsen minus trækkerens og trailerens egenvægt.</dd>
+      <dt>Trækker</dt><dd>Lastbilen der trækker traileren. Trækker og trailer sammen er et vogntog.</dd>
+      <dt>Chassis</dt><dd>En åben trailer uden sider og tag. Godset skal dækkes, hvis det ikke må blive vådt.</dd>
+      <dt>Euro-klasse</dt><dd>Hvor rene motorerne er. Euro 4 udleder mindre end Euro 2 og 3.</dd>
+      <dt>Maut</dt><dd>Vejafgift pr. kilometer på de tyske motorveje. Prisen afhænger af Euro-klasse og antal aksler.</dd>
+      <dt>Olietillæg</dt><dd>Procent som transportøren lægger oven i kilometerprisen, når dieselprisen stiger.</dd>
+      <dt>Læs</dt><dd>Ét vogntog på én tur.</dd>
+    </dl>
+  </section>
+</div>
+<p class="foot">Alt regnes i browseren. Ingen AI, ingen server. Tallene gemmes kun på din egen maskine. Priser i DKK uden moms.</p>
+</div>
+
+<script>
+(function (root) {
+  'use strict';
+
+  /* ===================== REGNEMOTOR (ren, uden DOM) ===================== */
+  var MAUT = { '2-3': { kort: 0.82, lang: 0.89 }, '4-5': { kort: 0.67, lang: 0.74 } };
+  var FLAADE = { 2: 48, 3: 192, 4: 18 };
+  var TRAILERE = {
+    chassis3:  { navn: 'Chassis, 3 aksler',       egen: 5.1, aks: 3, b: 2.4, l: 13.6, aaben: true },
+    gardin2:   { navn: 'Gardintrailer, 2 aksler', egen: 6.2, aks: 2, b: 2.4, l: 13.6 },
+    gardin3:   { navn: 'Gardintrailer, 3 aksler', egen: 6.8, aks: 3, b: 2.4, l: 13.6 },
+    kasse2:    { navn: 'Kassetrailer, 2 aksler',  egen: 7.8, aks: 2, b: 2.4, l: 13.6 },
+    kasse3:    { navn: 'Kassetrailer, 3 aksler',  egen: 8.6, aks: 3, b: 2.4, l: 13.6 },
+    koele2:    { navn: 'Køletrailer, 2 aksler',   egen: 8.2, aks: 2, b: 2.4, l: 13.2 },
+    koele3:    { navn: 'Køletrailer, 3 aksler',   egen: 8.8, aks: 3, b: 2.4, l: 13.2 }
+  };
+
+  function r2(x) { return Math.round((x + Number.EPSILON) * 100) / 100; }
+  function r6(x) { return Math.round((x + Number.EPSILON) * 1e6) / 1e6; }
+  function num(x) { x = Number(x); return isFinite(x) ? x : 0; }
+
+  function vaegtgraenseFor(aksler) { return aksler >= 5 ? 40 : (aksler === 4 ? 36 : null); }
+  function mautSatsFor(euro, aksler) {
+    var k = Number(euro) >= 4 ? '4-5' : '2-3';
+    return aksler >= 4 ? MAUT[k].lang : MAUT[k].kort;
+  }
+
+  function lastbilStandard(o) {
+    var s = {
+      type: 'lastbil', navn: 'Ny rute', notat: '',
+      tonnage: 100, pladeVaegt: 0, pladeB: 0, pladeL: 0,
+      trailerType: 'chassis3', traekEgen: 7.4, trailEgen: 5.1, traekAks: 2, trailAks: 3,
+      trailB: 2.4, trailL: 13.6, euro: 3, graense: 40, ekstra: 0, tilgaengelig: FLAADE[3],
+      afstand: 1000, kmPris: 7.4, olie: 16, mautKm: 0, mautSats: 0.89
+    };
+    for (var k in o) s[k] = o[k];
+    return s;
+  }
+  function containerStandard(o) {
+    var s = {
+      type: 'container', navn: 'Ny rute (container)', notat: '',
+      tonnage: 100, contNyttelast: 25.4, contPris: 11600, transitDage: 21,
+      intervalDage: 2, prAfgang: 1, klarDage: 4, fristDage: 35
+    };
+    for (var k in o) s[k] = o[k];
+    return s;
+  }
+  function eksempler() {
+    return [
+      lastbilStandard({ navn: 'Milano, lastbil', tonnage: 110, pladeVaegt: 120, pladeB: 2, pladeL: 4,
+        afstand: 1452, kmPris: 7.4, olie: 16, mautKm: 0, mautSats: mautSatsFor(3, 5) }),
+      lastbilStandard({ navn: 'Budapest, lastbil', tonnage: 230, pladeVaegt: 320, pladeB: 2, pladeL: 5,
+        afstand: 1462, kmPris: 6.75, olie: 16, mautKm: 695, mautSats: mautSatsFor(3, 5) }),
+      containerStandard({ navn: 'Budapest, container og flodpram', tonnage: 230 })
+    ];
+  }
+
+  var NAVNE = { tonnage: 'Godsets vægt', graense: 'Vægtgrænse', traekEgen: 'Trækkerens egenvægt', trailEgen: 'Trailerens egenvægt',
+    afstand: 'Afstand', kmPris: 'Kilometerpris', ekstra: 'Ekstra vægt', olie: 'Olietillæg', mautKm: 'Maut, km', mautSats: 'Maut-sats',
+    pladeVaegt: 'Vægt pr. plade', pladeB: 'Pladens bredde', pladeL: 'Pladens længde', trailB: 'Trailerens bredde', trailL: 'Trailerens længde',
+    traekAks: 'Trækkerens aksler', trailAks: 'Trailerens aksler', contNyttelast: 'Nyttelast pr. container', contPris: 'Pris pr. container',
+    transitDage: 'Transporttid', intervalDage: 'Afgang hver', prAfgang: 'Containere pr. afgang', klarDage: 'Godset klar efter', fristDage: 'Frist' };
+
+  /* tjekker at felterne giver mening, før der regnes. Returnerer liste af fejl-tekster */
+  function tjekFelter(s, positive, ikkeNegative, heltal) {
+    var f = [];
+    positive.forEach(function (k) {
+      var v = Number(s[k]);
+      if (!isFinite(v) || v <= 0) f.push(NAVNE[k] + ' skal være over 0.');
+      else if (v > 1e7) f.push(NAVNE[k] + ' er urealistisk stor.');
+    });
+    ikkeNegative.forEach(function (k) {
+      var v = Number(s[k]);
+      if (!isFinite(v) || v < 0) f.push(NAVNE[k] + ' må ikke være negativ.');
+      else if (v > 1e7) f.push(NAVNE[k] + ' er urealistisk stor.');
+    });
+    (heltal || []).forEach(function (k) {
+      if (Number(s[k]) % 1 !== 0) f.push(NAVNE[k] + ' skal være et helt tal.');
+    });
+    return f;
+  }
+  function afvis(res, fejl) {
+    fejl.forEach(function (t) { res.msg.push({ n: 'fejl', t: t }); });
+    res.fejl = true; res.laes = null; res.tur = null; res.total = null; res.perTon = null;
+    return res;
+  }
+
+  function beregnLastbil(s) {
+    var trin = [], msg = [];
+    var tonnage = num(s.tonnage), graense = num(s.graense), traek = num(s.traekEgen),
+        trail = num(s.trailEgen), ekstra = num(s.ekstra), afstand = num(s.afstand),
+        kmPris = num(s.kmPris), olie = num(s.olie), mautKm = num(s.mautKm), mautSats = num(s.mautSats);
+    var aksler = num(s.traekAks) + num(s.trailAks);
+
+    var nyt = r6(graense - traek - trail - ekstra);
+    trin.push({ t: 'Nyttelast pr. læs', f: 'vægtgrænse − trækker − trailer − ekstra vægt = ' + fm(graense) + ' − ' + fm(traek) + ' − ' + fm(trail) + ' − ' + fm(ekstra), v: fm(nyt) + ' t' });
+
+    var res = { type: 'lastbil', trin: trin, msg: msg, nyttelast: nyt, laes: null, tur: null, total: null,
+      perTon: null, enhed: 'læs', fejl: false, fristOk: null };
+
+    var tjek = tjekFelter(s, ['tonnage', 'graense', 'traekEgen', 'trailEgen', 'afstand', 'kmPris'],
+      ['ekstra', 'olie', 'mautKm', 'mautSats', 'pladeVaegt', 'pladeB', 'pladeL', 'trailB', 'trailL', 'traekAks', 'trailAks']);
+    if (tjek.length) { res.trin = []; res.nyttelast = undefined; return afvis(res, tjek); }
+    if (nyt <= 0) {
+      msg.push({ n: 'fejl', t: 'Der er ingen nyttelast tilbage (' + fm(nyt) + ' t). Vogntoget vejer for meget tomt til den vægtgrænse. Vælg en lettere trailer eller tjek grænsen.' });
+      res.fejl = true; return res;
+    }
+
+    var laes = Math.ceil(r6(tonnage / nyt));
+    trin.push({ t: 'Antal læs', f: 'godsets vægt ÷ nyttelast, rundet op = ' + fm(tonnage) + ' ÷ ' + fm(nyt) + ' = ' + fm(r6(tonnage / nyt), 3), v: laes + ' læs' });
+    var sidste = r6(tonnage - (laes - 1) * nyt);
+    trin.push({ t: 'Sidste læs', f: 'godsets vægt − fulde læs × nyttelast', v: fm(sidste) + ' t' });
+
+    var km = r2(afstand * kmPris);
+    var olieKr = r2(km * olie / 100);
+    var maut = r2(mautKm * mautSats);
+    var tur = r2(km + olieKr + maut);
+    trin.push({ t: 'Kilometerpris', f: fm(afstand, 0) + ' km × ' + fm(kmPris) + ' kr', v: fk(km) });
+    trin.push({ t: 'Olietillæg', f: fm(olie) + ' % af kilometerprisen', v: fk(olieKr) });
+    trin.push({ t: 'Maut', f: fm(mautKm, 0) + ' km × ' + fm(mautSats) + ' kr', v: fk(maut) });
+    trin.push({ t: 'Pris pr. tur', f: 'kilometerpris + olietillæg + Maut (rundet til øre)', v: fk(tur) });
+    var total = r2(laes * tur);
+    trin.push({ t: 'Samlet pris', f: laes + ' læs × ' + fk(tur), v: fk(total) });
+
+    res.laes = laes; res.tur = tur; res.total = total; res.perTon = r2(total / tonnage);
+    res.sidste = sidste; res.km = km; res.olieKr = olieKr; res.maut = maut;
+
+    /* luft i vægten */
+    var luft = r6(nyt - tonnage / laes);
+    res.luft = luft;
+    if (luft < 0.05) {
+      msg.push({ n: 'advarsel', t: 'Næsten ingen luft i vægten (' + fm(luft) + ' t pr. læs). Hvis paller, presenning eller kæder vejer noget, skal der et ekstra læs til. Skriv deres vægt i feltet "Ekstra vægt pr. læs" og se, hvad der sker.' });
+    } else {
+      msg.push({ n: 'info', t: 'Der er ' + fm(luft) + ' t luft pr. læs, før der skal et læs mere til.' });
+    }
+
+    /* plader */
+    var pv = num(s.pladeVaegt);
+    if (pv > 0) {
+      var perLaes = Math.floor(r6(nyt * 1000 / pv));
+      var iAlt = Math.ceil(r6(tonnage * 1000 / pv));
+      res.pladerPrLaes = perLaes; res.pladerIAlt = iAlt;
+      trin.push({ t: 'Plader pr. læs', f: 'nyttelast ÷ pladevægt, rundet ned = ' + fm(nyt * 1000, 0) + ' kg ÷ ' + fm(pv, 0) + ' kg', v: perLaes + ' stk.' });
+      trin.push({ t: 'Plader i alt', f: 'godsets vægt ÷ pladevægt, rundet op', v: iAlt + ' stk.' });
+      var laesPlader = perLaes > 0 ? Math.ceil(iAlt / perLaes) : null;
+      if (laesPlader !== null && laesPlader > laes) {
+        msg.push({ n: 'advarsel', t: 'Pladerne går ikke op i hele stykker. ' + laes + ' læs bærer ' + (laes * perLaes) + ' plader, men der skal bruges ' + iAlt + '. Tæller man hele plader, bliver det ' + laesPlader + ' læs, ikke ' + laes + '.' });
+      }
+    }
+
+    /* mål */
+    var pb = num(s.pladeB), pl = num(s.pladeL), tb = num(s.trailB), tl = num(s.trailL);
+    if (pb > 0 && pl > 0 && tb > 0 && tl > 0) {
+      var passer = (pb <= tb && pl <= tl) || (pl <= tb && pb <= tl);
+      msg.push(passer
+        ? { n: 'ok', t: 'Pladerne (' + fm(pb) + ' × ' + fm(pl) + ' m) passer i traileren (' + fm(tb) + ' × ' + fm(tl) + ' m).' }
+        : { n: 'fejl', t: 'Pladerne (' + fm(pb) + ' × ' + fm(pl) + ' m) passer ikke i traileren (' + fm(tb) + ' × ' + fm(tl) + ' m).' });
+      if (!passer) res.fejl = true;
+    }
+
+    /* vægtgrænse mod aksler */
+    var regel = vaegtgraenseFor(aksler);
+    if (regel === null) {
+      msg.push({ n: 'info', t: 'Med ' + aksler + ' aksler er grænsen ikke oplyst i casen. Tjek den selv.' });
+    } else if (graense > regel) {
+      msg.push({ n: 'fejl', t: aksler + ' aksler giver ' + regel + ' t. Du har sat ' + fm(graense) + ' t. Over ' + regel + ' t kræver casen en 40 fods ISO-container (44 t). Er vogntoget lovligt?' });
+      res.fejl = true;
+    }
+
+    /* åben trailer */
+    var tt = TRAILERE[s.trailerType];
+    if (tt && tt.aaben) {
+      msg.push({ n: 'advarsel', t: 'Chassis er åben. Godset må ikke blive vådt, så det skal dækkes. Presenningens vægt hører med i "Ekstra vægt pr. læs".' });
+    }
+
+    /* flåde */
+    var til = num(s.tilgaengelig);
+    if (til > 0) {
+      msg.push(laes <= til
+        ? { n: 'info', t: 'PDT har ' + til + ' trækkere i Euro-klasse ' + s.euro + '. Der skal bruges ' + laes + '.' }
+        : { n: 'fejl', t: 'PDT har kun ' + til + ' trækkere i Euro-klasse ' + s.euro + '. Der skal bruges ' + laes + ' på én gang.' });
+      if (laes > til) res.fejl = true;
+    }
+    return res;
+  }
+
+  function beregnContainer(s) {
+    var trin = [], msg = [];
+    var t = num(s.tonnage), cn = num(s.contNyttelast), cp = num(s.contPris), tr = num(s.transitDage),
+        iv = Math.max(1, num(s.intervalDage)), pa = Math.max(1, num(s.prAfgang)), kl = num(s.klarDage), fr = num(s.fristDage);
+    var res = { type: 'container', trin: trin, msg: msg, laes: null, tur: cp, total: null, perTon: null,
+      enhed: 'containere', fejl: false, fristOk: null };
+    var tjek = tjekFelter(s, ['tonnage', 'contNyttelast', 'contPris', 'fristDage'], ['transitDage', 'klarDage'], ['prAfgang']);
+    if (num(s.intervalDage) < 1) tjek.push('Afgang hver skal være mindst 1 dag.');
+    if (num(s.prAfgang) < 1) tjek.push('Containere pr. afgang skal være mindst 1.');
+    if (tjek.length) { res.trin = []; return afvis(res, tjek); }
+    var n = Math.ceil(r6(t / cn));
+    trin.push({ t: 'Antal containere', f: 'godsets vægt ÷ nyttelast pr. container, rundet op = ' + fm(t) + ' ÷ ' + fm(cn) + ' = ' + fm(r6(t / cn), 3), v: n + ' stk.' });
+    var total = r2(n * cp);
+    trin.push({ t: 'Samlet pris', f: n + ' × ' + fk(cp), v: fk(total) });
+    var afgange = Math.ceil(n / pa);
+    var sidsteAfg = kl + (afgange - 1) * iv;
+    var ankomst = sidsteAfg + tr;
+    trin.push({ t: 'Antal afgange', f: n + ' containere ÷ ' + pa + ' pr. afgang, rundet op', v: afgange + ' afgange' });
+    trin.push({ t: 'Sidste afgang', f: 'klar efter ' + kl + ' dage + ' + (afgange - 1) + ' × ' + iv + ' dage', v: 'dag ' + sidsteAfg });
+    trin.push({ t: 'Sidste container fremme', f: 'sidste afgang + ' + tr + ' dages transport', v: 'dag ' + ankomst });
+    var mulige = Math.max(0, Math.floor((fr - tr - kl) / iv) + 1);
+    var maxTon = r2(mulige * pa * cn);
+    trin.push({ t: 'Mest muligt inden fristen', f: mulige + ' afgange × ' + pa + ' × ' + fm(cn) + ' t', v: fm(maxTon) + ' t' });
+    res.laes = n; res.total = total; res.perTon = r2(total / t); res.ankomst = ankomst; res.maxTon = maxTon;
+    res.fristOk = ankomst <= fr;
+    if (res.fristOk) {
+      msg.push({ n: 'ok', t: 'Sidste container er fremme dag ' + ankomst + ', og fristen er dag ' + fr + '.' });
+    } else {
+      msg.push({ n: 'fejl', t: 'For sent. Sidste container er fremme dag ' + ankomst + ', men fristen er dag ' + fr + '. Inden fristen kan der højst nå ' + fm(maxTon) + ' t frem, og der skal bruges ' + fm(t) + ' t.' });
+      res.fejl = true;
+    }
+    return res;
+  }
+
+  function beregn(s) { return s.type === 'container' ? beregnContainer(s) : beregnLastbil(s); }
+
+  /* formatering */
+  function fm(x, d) {
+    d = (d === undefined) ? 2 : d;
+    return Number(x).toLocaleString('da-DK', { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  function fk(x) { return fm(x, 2) + ' kr'; }
+
+  /* tal-læsning: 7,4 og 7.4 og 1.452 og 1.452,50 */
+  function parseTal(str) {
+    var t = String(str).trim().replace(/\s/g, '');
+    if (t === '') return 0;
+    if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+    else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+    if (!/^-?\d+(\.\d+)?$/.test(t)) return 0;
+    var n = parseFloat(t);
+    return isFinite(n) ? n : 0;
+  }
+  /* er teksten et læsbart tal? (tom tæller ikke som fejl) */
+  function erTal(str) {
+    var t = String(str).trim().replace(/\s/g, '');
+    if (t === '') return true;
+    if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+    else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+    return /^-?\d+(\.\d+)?$/.test(t);
+  }
+  function tilInput(n) { return String(n).replace('.', ','); }
+
+  var API = { beregn: beregn, beregnLastbil: beregnLastbil, beregnContainer: beregnContainer,
+    lastbilStandard: lastbilStandard, containerStandard: containerStandard, eksempler: eksempler,
+    mautSatsFor: mautSatsFor, vaegtgraenseFor: vaegtgraenseFor, parseTal: parseTal, erTal: erTal,
+    TRAILERE: TRAILERE, FLAADE: FLAADE, MAUT: MAUT };
+  root.Turberegner = API;
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+
+  if (typeof document === 'undefined') return;
+
+  /* ===================== TILSTAND ===================== */
+  var KEY = 'turberegner.v1';
+  var state;
+  function gem() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function hent() {
+    try { var r = localStorage.getItem(KEY); if (r) { var p = JSON.parse(r); if (Array.isArray(p) && p.length) return p; } } catch (e) {}
+    return eksempler();
+  }
+  state = hent();
+
+  /* ===================== FELTER ===================== */
+  var G_LASTBIL = [
+    { g: 'Godset', f: [
+      ['tonnage', 'Godsets vægt (ton)', ''],
+      ['pladeVaegt', 'Vægt pr. plade (kg)', 'Tom = ingen plade-tjek'],
+      ['pladeB', 'Plade, bredde (m)', ''],
+      ['pladeL', 'Plade, længde (m)', '']] },
+    { g: 'Materiel', f: [
+      ['trailerType', 'Trailertype', '', 'select-trailer'],
+      ['euro', 'Euro-klasse på trækkeren', '', 'select-euro'],
+      ['traekEgen', 'Trækker, egenvægt (ton)', 'Vægt tom'],
+      ['trailEgen', 'Trailer, egenvægt (ton)', 'Vægt tom'],
+      ['traekAks', 'Trækker, aksler', ''],
+      ['trailAks', 'Trailer, aksler', ''],
+      ['trailB', 'Trailer indvendig bredde (m)', ''],
+      ['trailL', 'Trailer indvendig længde (m)', ''],
+      ['graense', 'Vægtgrænse (ton)', 'Hele vogntoget med last. Sættes efter aksler'],
+      ['ekstra', 'Ekstra vægt pr. læs (ton)', 'Paller, presenning, kæder'],
+      ['tilgaengelig', 'Trækkere til rådighed', 'Sættes efter Euro-klasse']] },
+    { g: 'Pris', f: [
+      ['afstand', 'Afstand (km)', ''],
+      ['kmPris', 'Kilometerpris (kr)', ''],
+      ['olie', 'Olietillæg (%)', 'Oveni kilometerprisen'],
+      ['mautKm', 'Maut, km', 'Km på tyske motorveje'],
+      ['mautSats', 'Maut-sats (kr pr. km)', 'Sættes efter Euro og aksler']] }
+  ];
+  var G_CONTAINER = [
+    { g: 'Godset', f: [['tonnage', 'Godsets vægt (ton)', ''], ['contNyttelast', 'Nyttelast pr. container (ton)', '']] },
+    { g: 'Pris og tid', f: [
+      ['contPris', 'Pris pr. container (kr)', ''],
+      ['transitDage', 'Transporttid (dage)', 'Fra afgang til fremme'],
+      ['intervalDage', 'Afgang hver (dage)', ''],
+      ['prAfgang', 'Containere pr. afgang', 'Casen siger det ikke. Standard er 1'],
+      ['klarDage', 'Godset klar efter (dage)', ''],
+      ['fristDage', 'Frist (dage)', '5 uger = 35 dage']] }
+  ];
+
+  function esc(x) { return String(x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function feltHtml(s, i, def) {
+    var k = def[0], h = def[2] ? '<span class="h">' + esc(def[2]) + '</span>' : '';
+    var id = 'f' + i + '-' + k;
+    var ctrl;
+    if (def[3] === 'select-trailer') {
+      ctrl = '<select id="' + id + '" data-k="trailerType">';
+      Object.keys(TRAILERE).forEach(function (t) {
+        ctrl += '<option value="' + t + '"' + (s.trailerType === t ? ' selected' : '') + '>' + esc(TRAILERE[t].navn) + '</option>';
+      });
+      ctrl += '<option value="egen"' + (s.trailerType === 'egen' ? ' selected' : '') + '>Egen trailer</option></select>';
+    } else if (def[3] === 'select-euro') {
+      ctrl = '<select id="' + id + '" data-k="euro">' + [2, 3, 4].map(function (e) {
+        return '<option value="' + e + '"' + (Number(s.euro) === e ? ' selected' : '') + '>Euro ' + e + '</option>';
+      }).join('') + '</select>';
+    } else {
+      ctrl = '<input type="text" inputmode="decimal" autocomplete="off" id="' + id + '" data-k="' + k + '" value="' + esc(tilInput(s[k])) + '">';
+    }
+    return '<label for="' + id + '">' + esc(def[1]) + h + ctrl + '</label>';
+  }
+
+  function kortHtml(s, i) {
+    var groups = s.type === 'container' ? G_CONTAINER : G_LASTBIL;
+    var h = '<article class="card" data-i="' + i + '" aria-label="' + esc(s.navn) + '">' +
+      '<div class="cardhead"><input class="name" type="text" data-k="navn" aria-label="Navn på ruten" value="' + esc(s.navn) + '" style="text-align:left">' +
+      '<button data-act="slet" aria-label="Slet ruten">Slet</button></div>';
+    groups.forEach(function (gr) {
+      h += '<fieldset><legend>' + gr.g + '</legend><div class="grid">';
+      gr.f.forEach(function (d) { h += feltHtml(s, i, d); });
+      h += '</div></fieldset>';
+    });
+    h += '<div class="out" data-out></div>';
+    h += '<label style="margin-top:14px" for="n' + i + '">Egne antagelser til denne rute<textarea id="n' + i + '" data-k="notat">' + esc(s.notat || '') + '</textarea></label>';
+    return h + '</article>';
+  }
+
+  function barHtml(s, r) {
+    var g = num(s.graense); if (g <= 0 || r.nyttelast === undefined) return '';
+    var seg = [
+      ['t1', 'Trækker', num(s.traekEgen)], ['t2', 'Trailer', num(s.trailEgen)],
+      ['t3', 'Ekstra', num(s.ekstra)], ['t4', 'Nyttelast', Math.max(0, r.nyttelast)]
+    ];
+    var bar = '<div class="bar" role="img" aria-label="Vægtfordeling af ' + fm(g) + ' ton">';
+    var leg = '<div class="legend">';
+    seg.forEach(function (x) {
+      if (x[2] <= 0) return;
+      bar += '<div class="' + x[0] + '" style="width:' + Math.min(100, x[2] / g * 100) + '%" title="' + x[1] + ' ' + fm(x[2]) + ' t"></div>';
+      var col = { t1: 'var(--tractor)', t2: 'var(--trailer)', t3: 'var(--extra)', t4: 'var(--payload)' }[x[0]];
+      leg += '<span><i style="background:' + col + '"></i>' + x[1] + ' ' + fm(x[2]) + ' t</span>';
+    });
+    return bar + '</div>' + leg + '</div>';
+  }
+
+  function udHtml(s) {
+    var r = beregn(s), h = '<div class="result">';
+    if (r.laes !== null) {
+      h += '<div class="big"><div><div class="n">' + r.laes + '</div><div class="l">' + (r.enhed === 'containere' ? 'containere' : 'læs (vogntog)') + '</div></div>' +
+        '<div><div class="n">' + fk(r.total) + '</div><div class="l">samlet pris</div></div>' +
+        '<div><div class="n" style="font-size:1.3rem">' + fk(r.tur) + '</div><div class="l">' + (r.enhed === 'containere' ? 'pr. container' : 'pr. tur') + '</div></div>' +
+        '<div><div class="n" style="font-size:1.3rem">' + fk(r.perTon) + '</div><div class="l">pr. ton</div></div></div>';
+    }
+    if (s.type !== 'container') h += barHtml(s, r);
+    if (r.msg.length) {
+      h += '<ul class="msgs">' + r.msg.map(function (m) { return '<li class="' + m.n + '">' + esc(m.t) + '</li>'; }).join('') + '</ul>';
+    }
+    h += '<details open><summary>Mellemregninger</summary><table class="steps"><tbody>' +
+      r.trin.map(function (t) { return '<tr><td>' + esc(t.t) + '</td><td>' + esc(t.f) + '</td><td>' + esc(t.v) + '</td></tr>'; }).join('') +
+      '</tbody></table></details></div>';
+    return h;
+  }
+
+  function sammenligningHtml() {
+    var rs = state.map(function (s) { return beregn(s); });
+    var bedst = -1;
+    rs.forEach(function (r, i) { if (!r.fejl && r.total !== null && (bedst < 0 || r.total < rs[bedst].total)) bedst = i; });
+    var h = '<table><thead><tr><th>Rute</th><th>Antal</th><th>Pris pr. enhed</th><th>Samlet pris</th><th>Pris pr. ton</th><th>Status</th></tr></thead><tbody>';
+    state.forEach(function (s, i) {
+      var r = rs[i], cls = i === bedst ? ' class="best"' : '';
+      var fejl = r.msg.filter(function (m) { return m.n === 'fejl'; }).length;
+      var adv = r.msg.filter(function (m) { return m.n === 'advarsel'; }).length;
+      var status = fejl ? fejl + (fejl === 1 ? ' fejl' : ' fejl') : (adv ? adv + (adv === 1 ? ' advarsel' : ' advarsler') : 'ok');
+      if (i === bedst) status += ', billigst uden fejl';
+      h += '<tr><td>' + esc(s.navn) + '</td><td>' + (r.laes === null ? '–' : r.laes + ' ' + (r.enhed === 'containere' ? 'containere' : 'læs')) + '</td>' +
+        '<td>' + (r.tur === null ? '–' : fk(r.tur)) + '</td><td' + cls + '>' + (r.total === null ? '–' : fk(r.total)) + '</td>' +
+        '<td>' + (r.perTon === null ? '–' : fk(r.perTon)) + '</td><td>' + esc(status) + '</td></tr>';
+    });
+    return h + '</tbody></table>';
+  }
+
+  function antagelserHtml() {
+    return [
+      'Olietillægget lægges kun på kilometerprisen, ikke på Maut.',
+      'Prisen pr. tur rundes til hele øre, før den ganges med antal læs. Sådan vil en faktura også se ud.',
+      'Vægtgrænsen følger akselantallet: 4 aksler er 36 t, 5 eller 6 aksler er 40 t. 44 t gælder kun med en 40 fods ISO-container (direktiv 85/3/EØF, som casen nævner).',
+      'Alle læs fyldes op til nyttelasten. Det sidste læs får resten.',
+      'Trækker og trailer vejer det, casen siger. Paller, presenning og kæder tæller kun med, hvis du skriver en ekstra vægt.',
+      'Prisen er for turen én vej. Tom retur er ikke regnet med.',
+      'Maut regnes kun på de kilometer du skriver, med satsen for 4 eller flere aksler. Casen nævner ingen Maut for Milano, så den står på 0 km.',
+      'Container: én container pr. afgang, medmindre du ændrer det. Vi regner i kalenderdage, og godset er klart efter 4 dage.',
+      'Priser er i DKK uden moms.'
+    ].map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('');
+  }
+
+  /* ===================== TEGNING OG EVENTS ===================== */
+  var cardsEl = document.getElementById('cards');
+
+  function tegnAlt() {
+    cardsEl.innerHTML = state.map(kortHtml).join('');
+    Array.prototype.forEach.call(cardsEl.querySelectorAll('.card'), function (c) {
+      c.querySelector('[data-out]').innerHTML = udHtml(state[c.getAttribute('data-i')]);
+    });
+    opdaterSamlet();
+  }
+  function opdaterSamlet() {
+    document.getElementById('cmp').innerHTML = sammenligningHtml();
+    document.getElementById('ant').innerHTML = antagelserHtml();
+  }
+  function setVal(card, k, v) {
+    var el = card.querySelector('[data-k="' + k + '"]'); if (el) el.value = tilInput(v);
+  }
+  function autoIndstil(s, card) {
+    var aks = num(s.traekAks) + num(s.trailAks);
+    var g = vaegtgraenseFor(aks); if (g !== null) s.graense = g;
+    s.mautSats = mautSatsFor(s.euro, aks);
+    s.tilgaengelig = FLAADE[Number(s.euro)] || 0;
+    if (card) { setVal(card, 'graense', s.graense); setVal(card, 'mautSats', s.mautSats); setVal(card, 'tilgaengelig', s.tilgaengelig); }
+  }
+
+  cardsEl.addEventListener('input', function (e) {
+    var el = e.target, k = el.getAttribute('data-k'); if (!k) return;
+    var card = el.closest('.card'), s = state[card.getAttribute('data-i')];
+    if (el.tagName === 'SELECT') return;
+    if (k === 'navn' || k === 'notat') s[k] = el.value;
+    else {
+      s[k] = parseTal(el.value);
+      if (erTal(el.value)) el.removeAttribute('aria-invalid'); else el.setAttribute('aria-invalid', 'true');
+    }
+    if (k === 'traekAks' || k === 'trailAks') autoIndstil(s, card);
+    if (k !== 'notat') card.querySelector('[data-out]').innerHTML = udHtml(s);
+    opdaterSamlet(); gem();
+  });
+  cardsEl.addEventListener('change', function (e) {
+    var el = e.target; if (el.tagName !== 'SELECT') return;
+    var k = el.getAttribute('data-k'), card = el.closest('.card'), i = card.getAttribute('data-i'), s = state[i];
+    if (k === 'trailerType') {
+      s.trailerType = el.value;
+      var t = TRAILERE[el.value];
+      if (t) { s.trailEgen = t.egen; s.trailAks = t.aks; s.trailB = t.b; s.trailL = t.l; }
+      autoIndstil(s);
+    } else if (k === 'euro') { s.euro = Number(el.value); autoIndstil(s); }
+    var y = window.scrollY;
+    cardsEl.innerHTML = state.map(kortHtml).join('');
+    Array.prototype.forEach.call(cardsEl.querySelectorAll('.card'), function (c) {
+      c.querySelector('[data-out]').innerHTML = udHtml(state[c.getAttribute('data-i')]);
+    });
+    window.scrollTo(0, y);
+    opdaterSamlet(); gem();
+  });
+  cardsEl.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act="slet"]'); if (!b) return;
+    var i = Number(b.closest('.card').getAttribute('data-i'));
+    if (state.length === 1) return;
+    state.splice(i, 1); tegnAlt(); gem();
+  });
+  document.getElementById('add-lastbil').addEventListener('click', function () {
+    state.push(lastbilStandard({ navn: 'Rute ' + (state.length + 1) })); tegnAlt(); gem();
+  });
+  document.getElementById('add-container').addEventListener('click', function () {
+    state.push(containerStandard({ navn: 'Rute ' + (state.length + 1) + ' (container)' })); tegnAlt(); gem();
+  });
+  document.getElementById('reset').addEventListener('click', function () {
+    state = eksempler(); tegnAlt(); gem();
+  });
+
+  tegnAlt();
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+</body>
+</html>
