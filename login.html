@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log ind | CargoTools</title>
+  <link rel="stylesheet" href="/platform/platform.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="/platform/auth.js"></script>
+</head>
+<body class="pf-login">
+  <aside class="pf-login-panel" aria-label="CargoTools">
+    <picture><source srcset="/billeder/login_globus.webp" type="image/webp"><img class="pf-globe" src="/billeder/login_globus.png" width="900" height="900" alt="Globus med transport rundt om verden"></picture>
+    <h1>CargoTools</h1><p>Dine værktøjer til fragt og transport</p>
+  </aside>
+  <main class="pf-login-main">
+    <div class="pf-form-wrap">
+      <h2 id="pf-title">Velkommen</h2><p class="pf-intro" id="pf-intro">Log ind for at bruge dine værktøjer.</p>
+      <div class="pf-tabs" role="tablist" aria-label="Vælg login eller ny konto">
+        <button class="pf-tab" id="pf-signin-tab" type="button" role="tab" aria-selected="true" aria-controls="pf-panel">Log ind</button>
+        <button class="pf-tab" id="pf-signup-tab" type="button" role="tab" aria-selected="false" aria-controls="pf-panel" tabindex="-1">Opret konto</button>
+      </div>
+      <div id="pf-panel" role="tabpanel" aria-labelledby="pf-signin-tab">
+        <form class="pf-form" id="pf-form">
+          <label for="pf-email">E-mail</label><input id="pf-email" name="email" type="email" autocomplete="email" required>
+          <label for="pf-password">Adgangskode</label><input id="pf-password" name="password" type="password" autocomplete="current-password" required>
+          <button class="pf-forgot" id="pf-forgot" type="button" disabled>Glemt adgangskode</button>
+          <button class="pf-submit" id="pf-submit" type="submit" disabled>Vent lidt</button>
+        </form>
+      </div>
+      <p class="pf-message" id="pf-message" role="status" aria-live="polite" aria-atomic="true"></p>
+      <p class="pf-note" id="pf-note">Brug mindst 8 tegn, når du opretter en konto.</p>
+    </div>
+  </main>
+  <noscript><div class="pf-auth-error">Slå JavaScript til for at logge ind.</div></noscript>
+  <script>
+  (() => {
+    'use strict';
+    const platform = window.Platform;
+    const form = document.getElementById('pf-form');
+    const email = document.getElementById('pf-email');
+    const password = document.getElementById('pf-password');
+    const submit = document.getElementById('pf-submit');
+    const forgot = document.getElementById('pf-forgot');
+    const message = document.getElementById('pf-message');
+    const tabs = [...document.querySelectorAll('.pf-tab')];
+    const next = platform.safeNext(new URLSearchParams(location.search).get('next'));
+    let mode = platform.recovery ? 'recovery' : 'signin';
+    let busy = false;
+    const say = (text, success = false) => { message.textContent = text; message.dataset.success = String(success); };
+    const errorText = (error) => {
+      const code = error?.code || '';
+      if (code === 'invalid_credentials' || /invalid login/i.test(error?.message || '')) return 'E-mail eller adgangskode er forkert.';
+      if (code === 'email_not_confirmed') return 'Bekræft din e-mail via linket i din mail.';
+      if (code === 'user_already_exists') return 'Denne e-mail har en konto. Vælg Log ind.';
+      if (code === 'weak_password' || /password.*least/i.test(error?.message || '')) return 'Vælg en stærkere adgangskode med mindst 8 tegn.';
+      if (code === 'same_password') return 'Vælg en anden adgangskode end den gamle.';
+      if (error?.status === 429 || /rate.limit/i.test(code)) return 'For mange forsøg. Vent lidt og prøv igen.';
+      if (error?.status === 422 || code === 'email_address_invalid') return 'Tjek din e-mail og adgangskode.';
+      return 'Det lykkedes ikke. Tjek din forbindelse og prøv igen.';
+    };
+    const render = () => {
+      const recovery = mode === 'recovery';
+      document.querySelector('.pf-tabs').hidden = recovery;
+      document.getElementById('pf-title').textContent = recovery ? 'Ny adgangskode' : 'Velkommen';
+      document.getElementById('pf-intro').textContent = recovery ? 'Vælg din nye adgangskode.' : 'Log ind for at bruge dine værktøjer.';
+      email.hidden = recovery; email.required = !recovery;
+      document.querySelector('label[for="pf-email"]').hidden = recovery;
+      forgot.hidden = mode !== 'signin';
+      password.autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
+      password.minLength = mode === 'signin' ? 1 : 8;
+      submit.textContent = recovery ? 'Gem adgangskode' : mode === 'signup' ? 'Opret konto' : 'Log ind';
+      document.getElementById('pf-note').hidden = mode === 'signin';
+      tabs.forEach((tab, index) => { const active = (mode === 'signup') === (index === 1); tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1; });
+      document.getElementById('pf-panel').setAttribute('aria-labelledby', recovery ? 'pf-title' : mode === 'signup' ? 'pf-signup-tab' : 'pf-signin-tab');
+    };
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => { if (busy) return; mode = index ? 'signup' : 'signin'; say(''); render(); });
+      tab.addEventListener('keydown', (event) => {
+        if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+          event.preventDefault(); const target = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs[1] : tabs[1 - index]; target.click(); target.focus();
+        }
+      });
+    });
+    const run = async (action) => {
+      if (busy) return;
+      busy = true; submit.disabled = true; forgot.disabled = true; form.setAttribute('aria-busy', 'true'); say('Vent lidt...');
+      try { await action(); } catch (error) { say(errorText(error)); }
+      finally { busy = false; submit.disabled = false; forgot.disabled = false; form.removeAttribute('aria-busy'); }
+    };
+    window.addEventListener('pf-recovery', () => { mode = 'recovery'; render(); });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      run(async () => {
+        let result;
+        if (mode === 'recovery') result = await platform.client.auth.updateUser({ password: password.value });
+        else if (mode === 'signup') result = await platform.client.auth.signUp({ email: email.value.trim(), password: password.value, options: { emailRedirectTo: location.origin + '/login.html?next=' + encodeURIComponent(next) } });
+        else result = await platform.client.auth.signInWithPassword({ email: email.value.trim(), password: password.value });
+        if (result.error) throw result.error;
+        if (mode === 'signup' && !result.data.session) { say('Tjek din mail. Klik på linket for at bekræfte din konto.', true); return; }
+        location.replace(next);
+      });
+    });
+    forgot.addEventListener('click', () => {
+      if (!email.reportValidity()) return;
+      run(async () => {
+        const { error } = await platform.client.auth.resetPasswordForEmail(email.value.trim(), { redirectTo: location.origin + '/login.html?recovery=1&next=' + encodeURIComponent(next) });
+        if (error) throw error;
+        say('Hvis din e-mail har en konto, får du et link til en ny adgangskode.', true);
+      });
+    });
+    render();
+    platform.ready.then((user) => {
+      if (!platform.client || platform.sessionError) { say('Login kunne ikke kontrolleres. Genindlæs siden.'); return; }
+      if (user && !platform.recovery) { location.replace(next); return; }
+      if (platform.recovery) mode = 'recovery';
+      if (platform.recovery && !user) { mode = 'signin'; say('Linket virker ikke længere. Skriv din e-mail og vælg Glemt adgangskode.'); }
+      render(); submit.disabled = false; forgot.disabled = false;
+      if (new URLSearchParams(location.hash.slice(1)).has('error')) say('Linket virker ikke længere. Skriv din e-mail og vælg Glemt adgangskode.');
+    });
+  })();
+  </script>
+</body>
+</html>
