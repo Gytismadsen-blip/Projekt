@@ -30,7 +30,13 @@
     menu.addEventListener('click', () => { const open = menu.getAttribute('aria-expanded') !== 'true'; menu.setAttribute('aria-expanded', String(open)); bar.classList.toggle('pf-menu-open', open); });
     bar.addEventListener('keydown', (event) => { if (event.key === 'Escape') { close(); menu.focus(); } });
     document.addEventListener('click', (event) => { if (!bar.contains(event.target)) close(); });
-    bar.querySelector('.pf-logout').addEventListener('click', window.Platform.logout);
+    if (user.demo) {
+      // Demo: vis tydeligt at man ikke er logget ind, og giv en vej til en rigtig konto
+      email.textContent = 'Demo';
+      Object.assign(email.style, { background: '#E5A13A', color: '#16294A', fontWeight: '700', padding: '2px 10px', borderRadius: '999px' });
+      const out = bar.querySelector('.pf-logout'); out.textContent = 'Opret konto';
+      out.addEventListener('click', () => { window.Platform.endDemo(); location.href = '/login.html'; });
+    } else bar.querySelector('.pf-logout').addEventListener('click', window.Platform.logout);
     document.body.prepend(bar);
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();

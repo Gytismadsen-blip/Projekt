@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CargoTools demo</title>
+<script>
+  // Starter demo i denne fane og sender videre til forsiden
+  try { sessionStorage.setItem('cargotools-demo', '1'); } catch (e) { /* uden lagring virker demo ikke */ }
+  location.replace('/');
+</script>
+</head>
+<body style="font-family:sans-serif;background:#F0EDE7;padding:24px">
+<noscript>Slå JavaScript til for at prøve CargoTools.</noscript>
+<p><a href="/">Åbn CargoTools</a></p>
+</body>
+</html>

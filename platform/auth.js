@@ -23,6 +23,11 @@
     if (document.body) show(); else document.addEventListener('DOMContentLoaded', show, { once: true });
   };
   platform.is_admin = false;
+  // Demo: værktøjerne regner kun i browseren, så de kan vises uden konto. Gælder kun denne fane.
+  const DEMO_KEY = 'cargotools-demo';
+  const demoWanted = () => { try { return sessionStorage.getItem(DEMO_KEY) === '1'; } catch { return false; } };
+  platform.endDemo = () => { try { sessionStorage.removeItem(DEMO_KEY); } catch { /* ingen lagring: intet at rydde */ } };
+  platform.demo = false;
   let heartbeatBusy = false;
   let forcedLogout = false;
   let gate;
@@ -90,12 +95,18 @@
       platform.client = window.supabase.createClient('https://pixmmcdknuwgnmhgpgyf.supabase.co', 'sb_publishable_p_1_SirQVg0aty6lZrg3oA_UoV13PVB');
       platform.client.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY') { platform.recovery = true; window.dispatchEvent(new Event('pf-recovery')); }
-        if (event === 'SIGNED_OUT' && !loginPage && !forcedLogout) { document.documentElement.classList.add('pf-auth-pending'); toLogin(); }
+        if (event === 'SIGNED_OUT' && !loginPage && !forcedLogout && !platform.demo) { document.documentElement.classList.add('pf-auth-pending'); toLogin(); }
         window.dispatchEvent(new CustomEvent('pf-user', { detail: session?.user || null }));
       });
       const result = await Promise.race([platform.client.auth.getSession(), new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('timeout')), 12000); })]);
       if (result.error) throw result.error;
       const user = result.data.session?.user || null;
+      if (user) platform.endDemo();
+      if (!loginPage && !user && demoWanted() && !location.pathname.startsWith('/admin/')) {
+        platform.demo = true;
+        document.documentElement.classList.remove('pf-auth-pending');
+        return { email: 'Demo', demo: true };
+      }
       if (!loginPage && !user) { toLogin(); return null; }
       if (!loginPage && user) {
         const allowed = await heartbeat(result.data.session);
@@ -118,7 +129,7 @@
   };
   // Recheck pages restored from the browser's back/forward cache.
   window.addEventListener('pageshow', async (event) => {
-    if (!event.persisted || loginPage) return;
+    if (!event.persisted || loginPage || platform.demo) return;
     document.documentElement.classList.add('pf-auth-pending');
     try {
       const { data, error } = await platform.client.auth.getSession();
