@@ -24,6 +24,9 @@
         <form class="pf-form" id="pf-form">
           <label for="pf-email">E-mail</label><input id="pf-email" name="email" type="email" autocomplete="email" required>
           <label for="pf-password">Adgangskode</label><input id="pf-password" name="password" type="password" autocomplete="current-password" required>
+          <label for="pf-password-repeat" id="pf-repeat-label" hidden>Gentag adgangskode</label>
+          <input id="pf-password-repeat" name="password-repeat" type="password" autocomplete="new-password" hidden>
+          <ul id="pf-password-checks" hidden style="font-size:13px;line-height:1.5;margin:0;padding:0;list-style:none" aria-live="polite"></ul>
           <button class="pf-forgot" id="pf-forgot" type="button" disabled>Glemt adgangskode</button>
           <button class="pf-submit" id="pf-submit" type="submit" disabled>Vent lidt</button>
         </form>
@@ -40,6 +43,8 @@
     const form = document.getElementById('pf-form');
     const email = document.getElementById('pf-email');
     const password = document.getElementById('pf-password');
+    const repeat = document.getElementById('pf-password-repeat');
+    const checks = document.getElementById('pf-password-checks');
     const submit = document.getElementById('pf-submit');
     const forgot = document.getElementById('pf-forgot');
     const message = document.getElementById('pf-message');
@@ -47,6 +52,25 @@
     const next = platform.safeNext(new URLSearchParams(location.search).get('next'));
     let mode = platform.recovery ? 'recovery' : 'signin';
     let busy = false;
+    let ready = false;
+    const updatePassword = () => {
+      const rules = [
+        [Array.from(password.value).length >= 8, 'Mindst 8 tegn'],
+        [/\p{Lu}/u.test(password.value), 'Mindst ét stort bogstav'],
+        [/[^\p{L}\p{N}\s]/u.test(password.value), 'Mindst ét specialtegn'],
+        [!!password.value && password.value === repeat.value, 'Adgangskoderne er ens']
+      ];
+      checks.replaceChildren(...rules.map(([ok, text]) => {
+        const item = document.createElement('li'); item.textContent = (ok ? '✓ ' : '○ ') + text;
+        item.style.color = ok ? '#246b5d' : 'var(--pf-muted)'; return item;
+      }));
+      const valid = rules.every(([ok]) => ok);
+      repeat.setCustomValidity(mode === 'signup' && !valid ? 'Opfyld alle krav til adgangskoden.' : '');
+      submit.disabled = busy || !ready || (mode === 'signup' && !valid);
+      return valid;
+    };
+    password.addEventListener('input', updatePassword);
+    repeat.addEventListener('input', updatePassword);
     const say = (text, success = false) => { message.textContent = text; message.dataset.success = String(success); };
     const errorText = (error) => {
       const code = error?.code || '';
@@ -67,12 +91,16 @@
       email.hidden = recovery; email.required = !recovery;
       document.querySelector('label[for="pf-email"]').hidden = recovery;
       forgot.hidden = mode !== 'signin';
+      repeat.hidden = mode !== 'signup'; repeat.required = mode === 'signup';
+      document.getElementById('pf-repeat-label').hidden = mode !== 'signup';
+      checks.hidden = mode !== 'signup';
       password.autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
       password.minLength = mode === 'signin' ? 1 : 8;
       submit.textContent = recovery ? 'Gem adgangskode' : mode === 'signup' ? 'Opret konto' : 'Log ind';
       document.getElementById('pf-note').hidden = mode === 'signin';
       tabs.forEach((tab, index) => { const active = (mode === 'signup') === (index === 1); tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1; });
       document.getElementById('pf-panel').setAttribute('aria-labelledby', recovery ? 'pf-title' : mode === 'signup' ? 'pf-signup-tab' : 'pf-signin-tab');
+      updatePassword();
     };
     tabs.forEach((tab, index) => {
       tab.addEventListener('click', () => { if (busy) return; mode = index ? 'signup' : 'signin'; say(''); render(); });
@@ -86,18 +114,24 @@
       if (busy) return;
       busy = true; submit.disabled = true; forgot.disabled = true; form.setAttribute('aria-busy', 'true'); say('Vent lidt...');
       try { await action(); } catch (error) { say(errorText(error)); }
-      finally { busy = false; submit.disabled = false; forgot.disabled = false; form.removeAttribute('aria-busy'); }
+      finally { busy = false; updatePassword(); forgot.disabled = false; form.removeAttribute('aria-busy'); }
     };
     window.addEventListener('pf-recovery', () => { mode = 'recovery'; render(); });
     form.addEventListener('submit', (event) => {
       event.preventDefault();
+      if (!ready || (mode === 'signup' && !updatePassword())) return;
       run(async () => {
         let result;
         if (mode === 'recovery') result = await platform.client.auth.updateUser({ password: password.value });
         else if (mode === 'signup') result = await platform.client.auth.signUp({ email: email.value.trim(), password: password.value, options: { emailRedirectTo: location.origin + '/login.html?next=' + encodeURIComponent(next) } });
         else result = await platform.client.auth.signInWithPassword({ email: email.value.trim(), password: password.value });
         if (result.error) throw result.error;
-        if (mode === 'signup' && !result.data.session) { say('Tjek din mail. Klik på linket for at bekræfte din konto.', true); return; }
+        if (mode === 'signup') {
+          if (Array.isArray(result.data.user?.identities) && result.data.user.identities.length === 0) {
+            say('Den e-mail har allerede en konto. Log ind i stedet.'); return;
+          }
+          say('Tjek din mail. Din konto skal også godkendes af en admin.', true); return;
+        }
         location.replace(next);
       });
     });
@@ -109,13 +143,14 @@
         say('Hvis din e-mail har en konto, får du et link til en ny adgangskode.', true);
       });
     });
+    if (new URLSearchParams(location.search).get('message') === 'force_logout') say('Du er blevet logget ud af en admin. Log ind igen.');
     render();
     platform.ready.then((user) => {
       if (!platform.client || platform.sessionError) { say('Login kunne ikke kontrolleres. Genindlæs siden.'); return; }
       if (user && !platform.recovery) { location.replace(next); return; }
       if (platform.recovery) mode = 'recovery';
       if (platform.recovery && !user) { mode = 'signin'; say('Linket virker ikke længere. Skriv din e-mail og vælg Glemt adgangskode.'); }
-      render(); submit.disabled = false; forgot.disabled = false;
+      ready = true; render(); forgot.disabled = false;
       if (new URLSearchParams(location.hash.slice(1)).has('error')) say('Linket virker ikke længere. Skriv din e-mail og vælg Glemt adgangskode.');
     });
   })();

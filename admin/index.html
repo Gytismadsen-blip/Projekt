@@ -1,0 +1,21 @@
+﻿<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin | CargoTools</title>
+<link rel="stylesheet" href="/platform/platform.css"><link rel="stylesheet" href="/admin/admin.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="/platform/auth.js"></script><script src="/platform/nav.js" defer></script><script src="/admin/admin.js" defer></script>
+</head>
+<body class="pf-home admin-page">
+<main class="admin-main">
+<div class="pf-heading"><p>CargoTools</p><h1>Admin</h1></div>
+<p id="message" role="status" aria-live="polite">Henter brugere...</p>
+<section id="dashboard" hidden aria-label="Brugere">
+<div class="admin-stats"><article><strong id="online">0</strong><span>Online nu</span></article><article><strong id="total">0</strong><span>Brugere i alt</span></article><article><strong id="pending">0</strong><span>Venter på godkendelse</span></article></div>
+<div class="admin-tools"><label>Søg <input id="search" type="search" placeholder="Navn eller e-mail"></label><label>Vis <select id="filter"><option value="all">Alle</option><option value="online">Online</option><option value="pending">Venter</option><option value="admins">Admins</option><option value="blocked">Spærret</option></select></label><span>Opdateres hvert 30. sekund</span></div>
+<div class="admin-table"><table><thead><tr><th scope="col">Bruger</th><th scope="col">Status</th><th scope="col">Adgang</th><th scope="col">Handlinger</th></tr></thead><tbody id="users"></tbody></table></div>
+<div class="admin-pages"><button id="prev" type="button">Forrige</button><span id="page" aria-live="polite"></span><button id="next" type="button">Næste</button></div>
+</section>
+</main>
+</body></html>

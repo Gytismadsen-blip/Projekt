@@ -79,7 +79,7 @@ function genererKonklusion(fund, beregning) {
     afsnit.push(ansvarTekst);
   }
 
-  tagStilling.push("Vurdér selv om der er grundlag for ansvarsgennembrud (forsæt eller grov uagtsomhed) — se de to erstatningsscenarier nedenfor.");
+  tagStilling.push("Vurdér selv om der er grundlag for ansvarsgennembrud (forsæt eller grov uagtsomhed). " + (beregning ? "Se de to erstatningsscenarier nedenfor." : "Se fane 3 for beregning af transportansvar."));
   if (hovedlov && REKLAMATION_PARAGRAF[hovedlov]) {
     paragraffer.add(REKLAMATION_PARAGRAF[hovedlov]);
     tagStilling.push("Tjek at reklamation er sket rettidigt, og at søgsmålsfristen (typisk 1 år) er overholdt.");

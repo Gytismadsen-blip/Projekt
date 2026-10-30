@@ -1,6 +1,6 @@
 /* ---------------- INIT ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
-  applyTheme(localStorage.getItem('regnemaskine_theme') || 'light');
+  applyTheme('light');
   document.getElementById('theme-toggle').addEventListener('click', () => {
     const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
     localStorage.setItem('regnemaskine_theme', next);

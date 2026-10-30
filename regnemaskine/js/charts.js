@@ -64,6 +64,7 @@ function drawLineChart(canvasId, optimum, fn1, fn2, xLabel, isTotalMinusFixed) {
 
 /* ---------------- THEME ---------------- */
 function applyTheme(theme) {
+  theme = 'light';
   document.documentElement.classList.toggle('dark', theme === 'dark');
   const icon = document.getElementById('theme-icon');
   if (icon) icon.setAttribute('data-lucide', theme === 'dark' ? 'sun' : 'moon');

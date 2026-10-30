@@ -7,6 +7,15 @@
     const bar = document.createElement('header'); bar.className = 'pf-nav';
     bar.innerHTML = `<a class="pf-brand" href="/">${PLATFORM_NAME}</a><button class="pf-menu-button" type="button" aria-expanded="false" aria-controls="pf-links">Menu</button><nav class="pf-links" id="pf-links" aria-label="Værktøjer"></nav><div class="pf-account"><span class="pf-email"></span><button class="pf-logout" type="button">Log ud</button></div>`;
     const links = [['/', 'Forside'], ['/fragtanalyse/', 'FragtAnalyse'], ['/turberegner/', 'Turberegner'], ['/ansvarsanalyse/', 'AnsvarsAnalyse'], ['/regnemaskine/', 'Regnemaskine']];
+    const syncAdmin = () => {
+      let link = bar.querySelector('[data-admin]');
+      if (window.Platform.is_admin && !link) {
+        link = document.createElement('a'); link.href = '/admin/'; link.textContent = 'Admin'; link.dataset.admin = 'true';
+        if (location.pathname.startsWith('/admin/')) link.setAttribute('aria-current', 'page');
+        bar.querySelector('nav').append(link);
+      } else if (!window.Platform.is_admin && link) link.remove();
+    };
+    syncAdmin(); window.addEventListener('pf-profile', syncAdmin);
     const path = location.pathname.replace(/index\.html$/, '').replace(/\/$/, '') || '/';
     for (const [href, name] of links) {
       const link = document.createElement('a'); link.href = href; link.textContent = name;

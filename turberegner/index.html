@@ -116,6 +116,13 @@ ol.ant{padding-left:20px}
 @media (max-width:480px){.grid{grid-template-columns:1fr}.find{grid-template-columns:1fr}}
 @media print{.top,.actions,button{display:none}body{background:#fff}section[hidden]{display:block}}
 </style>
+<link rel="stylesheet" href="/regnemaskine/workspace.css">
+<style>
+:root{--bg:var(--pf-paper);--ink:var(--pf-text);--muted:var(--pf-muted);--blue:var(--pf-navy);--amber:var(--pf-amber);--nav:var(--pf-card);--navtxt:var(--pf-navy);--line:#ddd9d1}
+body{font-size:14px;line-height:1.4}.top{flex-shrink:0;border-bottom:1px solid var(--line)}.top .in{max-width:none;padding:10px 24px 0}.brand{align-items:center}.brand p{color:var(--muted);font-size:13px}.brand h1{font-size:24px}nav.tabs{margin-top:6px;overflow:visible}nav.tabs button{color:var(--muted);padding:9px 16px;font-size:14px}nav.tabs button:hover{color:var(--blue)}nav.tabs button[aria-selected=true]{background:var(--blue);color:white;border-radius:8px 8px 0 0}
+.wrap{width:100%;max-width:none;flex:1;min-height:0;padding:14px 24px;display:flex;flex-direction:column}.wrap>section:not([hidden]){flex:1;min-height:0;display:flex;flex-direction:column}.foot{margin:8px 0 0;font-size:11px;flex-shrink:0}.rutegrid{flex:1;min-height:0;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:20px}.rutegrid>div{height:100%;min-height:0;display:flex;flex-direction:column}#kort{height:auto;flex:1;min-height:0}.rutegrid>aside{min-height:0}.rute{padding:8px 10px;margin-bottom:8px}.rute h3{font-size:14px}.rute .tal{font-size:12px}.rute button{margin-top:4px}.find{margin-top:0}.panel{border-radius:12px;padding:14px}.panel h3{font-size:14px}.actions{margin-bottom:10px}input[type=text],select{padding:5px 8px}.small{font-size:12px}.grid{gap:7px 12px}fieldset{margin-top:8px}label{font-size:12px}.cards#cards{display:block;flex:1;min-height:0}#cards>.card{display:none;height:100%;padding:16px}#cards>.card.workspace-current{display:flex!important}.cardhead{flex-shrink:0}.result{margin-top:0;padding-top:0}.workspace-flow .grid{grid-template-columns:repeat(2,minmax(0,1fr))}.workspace-flow fieldset{break-inside:auto}.workspace-flow fieldset .grid>div{break-inside:avoid}.workspace-flow .result{break-inside:auto}.workspace-flow .result>*{break-inside:avoid}.workspace-flow details{break-inside:auto}.workspace-flow .steps{font-size:12px}.workspace-flow th,.workspace-flow td{padding:5px}.workspace-flow .big .n{font-size:24px}#fane-konklusion>.panel{flex:1;min-height:0}.route-aside{height:100%}.route-aside>.workspace-flow{column-count:1}.rutegrid .workspace-flow{font-size:13px}.workspace-flow>#rutepanel>.rute{break-inside:avoid}#fane-sammenlign>.panel{display:none}#fane-sammenlign>.panel.workspace-current{display:flex!important;flex:1;min-height:0;margin:0!important}#fane-sammenlign .workspace-flow{column-count:1}#fane-ordbog>.cards{display:none}#fane-ordbog{background:white;border:1px solid var(--line);border-radius:12px;padding:16px}
+@media(max-width:900px){.wrap{padding:12px}.top .in{padding:12px}.brand p{width:100%}nav.tabs{flex-wrap:wrap}nav.tabs button{padding:8px}.rutegrid{display:flex;flex-direction:column}.rutegrid>div{width:100%}#kort{height:380px;min-height:380px;flex:auto}.rutegrid>aside{width:100%}#cards>.card{height:auto}.workspace-flow{columns:auto}.foot{margin-top:14px}}
+</style>
 </head>
 <body>
 <header class="top"><div class="in">
@@ -881,6 +888,37 @@ ol.ant{padding-left:20px}
   root.TurberegnerUI = { konklusionTekst: konklusionTekst, konklusionData: konklusionData, visFane: visFane, state: function () { return state; } };
   tegnAlt();
 })(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script src="../regnemaskine/js/workspace.js"></script>
+<script>
+// Navigation and presentation only. The original engine and state are unchanged.
+document.addEventListener('DOMContentLoaded',()=>{
+  if (!window.CargoPager || !window.ResizeObserver || !window.matchMedia) return;
+  const brand=document.querySelector('.brand');
+  brand.insertAdjacentHTML('afterbegin','<picture><source srcset="/billeder/ikon_tur.webp" type="image/webp"><img class="workspace-icon" src="/billeder/ikon_tur.png" alt=""></picture>');
+  const routeAside=document.querySelector('.rutegrid>aside');CargoPager(routeAside);routeAside.classList.add('workspace-current','route-aside');
+  const cards=document.getElementById('cards');let selected=0;
+  const picker=document.createElement('div');picker.className='workspace-picker';
+  picker.innerHTML='<label for="workspace-route">Vælg rute</label><select id="workspace-route"></select>';
+  cards.before(picker);const select=picker.lastElementChild;
+  function prepare(){
+    const list=[...cards.children];selected=Math.min(selected,Math.max(0,list.length-1));
+    select.replaceChildren(...list.map((c,i)=>{CargoPager(c);c.classList.toggle('workspace-current',i===selected);const o=document.createElement('option');o.value=i;o.textContent=c.querySelector('.name').value;return o;}));
+    select.value=selected;requestAnimationFrame(()=>list[selected]?.cargoUpdate?.());
+  }
+  select.onchange=()=>{selected=Number(select.value);prepare();};
+  new MutationObserver(prepare).observe(cards,{childList:true});prepare();
+  cards.addEventListener('input',e=>{if(e.target.matches('.name'))select.options[selected].textContent=e.target.value;});
+  // Long readouts use the same explicit page controls as the calculators.
+  const conclusion=document.getElementById('konk');const readout=document.createElement('div');readout.className='panel workspace-current';conclusion.before(readout);readout.append(conclusion);conclusion.classList.remove('panel');CargoPager(readout);
+  const compare=document.getElementById('fane-sammenlign');
+  const sections=[...compare.children];const chooser=document.createElement('div');chooser.className='workspace-picker';
+  chooser.innerHTML='<label for="workspace-compare">Vis</label><select id="workspace-compare"></select>';compare.prepend(chooser);
+  sections.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=p.querySelector('h2').textContent;chooser.lastElementChild.append(o);CargoPager(p);p.classList.toggle('workspace-current',i===0);});
+  chooser.lastElementChild.onchange=()=>sections.forEach((p,i)=>{p.classList.toggle('workspace-current',i===Number(chooser.lastElementChild.value));requestAnimationFrame(()=>p.cargoUpdate());});
+  const glossary=document.getElementById('fane-ordbog');
+  const original=glossary.firstElementChild;[...original.children].forEach(p=>glossary.append(p));original.remove();CargoPager(glossary);glossary.classList.add('workspace-current');
+});
 </script>
 </body>
 </html>

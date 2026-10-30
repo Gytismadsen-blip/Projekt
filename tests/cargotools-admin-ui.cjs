@@ -1,0 +1,54 @@
+const { chromium } = require('../../Logistik/node_modules/playwright');
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+(async()=>{
+ const browser=await chromium.launch({headless:true,channel:"msedge"});
+ const page=await browser.newPage({viewport:{width:1366,height:768}});
+ let signupIdentities=[];
+ let jwtClaims={amr:[{method:'password',timestamp:1793354400}],iat:1793354400}, logoutError=null;
+ let profile={status:'approved',is_admin:true,force_logout_at:null},rpcError=null;
+ const users=Array.from({length:24},(_,i)=>({id:i?'u'+i:'self',full_name:i===1?'<img src=x onerror="window.xss=1">':'Bruger '+i,email:'bruger'+i+'@test.dk',status:i%3?'approved':'pending',is_admin:!i,last_seen_at:new Date().toISOString()}));
+ await page.route('**/*',async route=>{
+  const url=new URL(route.request().url());
+  if(url.hostname==='logops-kappa.vercel.app') return route.fulfill({json:users,headers:{'Access-Control-Allow-Origin':'http://127.0.0.1:8765'}});
+  const accessToken='test.'+Buffer.from(JSON.stringify(jwtClaims)).toString('base64url')+'.signature';
+  if(url.hostname==='cdn.jsdelivr.net') return route.fulfill({contentType:'application/javascript',body:`window.supabase={createClient:()=>({rpc:async()=>(${JSON.stringify({data:[profile],error:rpcError})}),auth:{onAuthStateChange:()=>{},getSession:async()=>({data:{session:location.search.includes('message=force_logout')?null:{user:{id:'self',email:'admin@test.dk',last_sign_in_at:'2026-10-30T10:00:00Z'},access_token:${JSON.stringify(accessToken)}}}}),signOut:async()=>({error:${JSON.stringify(logoutError)}}),signUp:async()=>({data:{user:{identities:${JSON.stringify(signupIdentities)}}}})}})}`});
+  if(url.hostname!=='127.0.0.1') return route.abort();
+  let file=path.join(process.cwd(),decodeURIComponent(url.pathname)); if(url.pathname.endsWith('/'))file=path.join(file,'index.html');
+  if(!fs.existsSync(file)) return route.fulfill({status:404,body:''});
+  return route.fulfill({body:fs.readFileSync(file),contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html'});
+ });
+ await page.goto('http://127.0.0.1:8765/admin/'); await page.waitForSelector('#users tr');
+ assert.equal(await page.locator('#users tr').count(),6);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight),true);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ assert.equal(await page.locator('#users img').count(),0);
+ assert.equal(await page.locator('a[data-admin]').count(),1);
+ await page.locator('#next').click();assert.match(await page.locator('#page').innerText(),/Side 2/);
+ await page.locator('#search').fill('bruger23');assert.equal(await page.locator('#users tr').count(),1);
+ await page.locator('#search').fill('');await page.locator('#filter').selectOption('pending');
+ assert.match(await page.locator('#page').innerText(),/af 2/);
+ await page.locator('#filter').selectOption('admins');assert.equal(await page.locator('#users tr').count(),1);
+
+ profile.is_admin=false;await page.reload();await page.waitForFunction(()=>document.querySelector('#message').textContent.includes('Kun admin'));assert.equal(await page.locator('a[data-admin]').count(),0);assert.equal(await page.locator('#dashboard').isVisible(),false);
+ profile.status='pending';await page.reload();await page.waitForSelector('.pf-auth-error');assert.match(await page.locator('.pf-auth-error').innerText(),/venter på godkendelse/);
+ profile.status='suspended';await page.reload();await page.waitForSelector('.pf-auth-error');assert.match(await page.locator('.pf-auth-error').innerText(),/spærret/);
+ profile.status='approved';profile.is_admin=true;
+ // Tokenfornyelse og nyt login p? en anden enhed m? ikke skjule gammel session.
+ profile.force_logout_at='2026-10-30T12:00:00Z';jwtClaims.iat=Date.parse('2026-10-30T13:00:00Z')/1000;
+ await page.goto('http://127.0.0.1:8765/admin/');await page.waitForURL('**/login.html?message=force_logout');
+ assert.match(await page.locator('#pf-message').innerText(),/logget ud/);
+ jwtClaims.amr=[{method:'password',timestamp:Date.parse('2026-10-30T13:00:00Z')/1000}];
+ await page.goto('http://127.0.0.1:8765/admin/');await page.waitForSelector('#users tr');
+ jwtClaims.amr=[];logoutError={message:'network'};
+ await page.reload();await page.waitForSelector('.pf-auth-error');assert.match(page.url(),/admin/);
+ profile.force_logout_at=null;logoutError=null;rpcError={code:'PGRST202'};await page.goto('http://127.0.0.1:8765/');await page.waitForFunction(()=>!document.documentElement.classList.contains('pf-auth-pending'));
+ await page.goto('http://127.0.0.1:8765/login.html?message=force_logout');
+ await page.locator('#pf-signup-tab').click();await page.locator('#pf-email').fill('test@test.dk');await page.locator('#pf-password').fill('Password123!');await page.locator('#pf-password-repeat').fill('Password123!');await page.locator('#pf-submit').click();
+ await page.waitForFunction(()=>document.querySelector('#pf-message').textContent.includes('allerede en konto'));
+ signupIdentities=[{id:'new'}];await page.reload();await page.locator('#pf-signup-tab').click();await page.locator('#pf-email').fill('test@test.dk');await page.locator('#pf-password').fill('Password123!');await page.locator('#pf-password-repeat').fill('Password123!');await page.locator('#pf-submit').click();
+ await page.waitForFunction(()=>document.querySelector('#pf-message').textContent.includes('godkendes af en admin'));
+ console.log('Browser: layout 1366x768, XSS, søgning, paginering, admin-adgang, kontostatus og manglende SQL bestået');
+ await browser.close();
+})().catch(e=>{console.error(e);process.exitCode=1});

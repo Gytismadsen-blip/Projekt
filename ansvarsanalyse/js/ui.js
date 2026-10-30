@@ -1,5 +1,5 @@
 // UI-lag: binder klassificer.js, beregn.js, konklusion.js og lovdata.js sammen med DOM'en.
-// Ingen AI her — kun rendering og event-håndtering ud fra den regelbaserede analyse.
+// Ingen AI her. Kun rendering og event-håndtering ud fra den regelbaserede analyse.
 
 let state = {
   caseText: "",
@@ -51,17 +51,24 @@ function formatKr(n) {
 
 // --- A. Faneskift ---
 
+let aktivFane = "case";
+
 function skiftFane(tab) {
+  aktivFane = tab;
   const alleFaner = ["case", "lovvalg", "ansvar", "konklusion", "lovopslag"];
   alleFaner.forEach(t => {
     document.getElementById("tab-" + t).classList.toggle("hidden", t !== tab);
   });
   document.querySelectorAll("#tabbar .tab-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.tab === tab);
+    if (btn.dataset.tab === tab) btn.setAttribute("aria-current", "step");
+    else btn.removeAttribute("aria-current");
   });
   if (tab === "lovvalg") renderLovvalg();
   if (tab === "ansvar") renderAnsvar();
   if (tab === "konklusion") renderKonklusion();
+  opdaterTrin();
+  requestAnimationFrame(opdaterAlleSider);
 }
 
 function wireTabs() {
@@ -77,6 +84,9 @@ function wireFileUpload() {
   const fileInput = document.getElementById("fileInput");
 
   dropzone.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("keydown", e => {
+    if (e.target === dropzone && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); fileInput.click(); }
+  });
 
   fileInput.addEventListener("change", () => {
     if (fileInput.files.length > 0) haandterFil(fileInput.files[0]);
@@ -143,7 +153,7 @@ function renderChecklist() {
     linje.className = "flex gap-2 items-start";
     linje.innerHTML = `
       <span class="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-gray-900 text-xs font-bold">!</span>
-      <span><strong class="text-white">${escapeHtml(item.tekst)}</strong> — <span class="text-gray-400">${escapeHtml(item.note)}</span></span>
+      <span><strong class="text-white">${escapeHtml(item.tekst)}</strong>. <span class="text-gray-400">${escapeHtml(item.note)}</span></span>
     `;
     container.appendChild(linje);
   });
@@ -159,7 +169,7 @@ function renderFund() {
   count.textContent = `(${state.fund.length} fund)`;
 
   if (state.fund.length === 0) {
-    list.innerHTML = '<p class="text-gray-500 text-sm">Der blev ikke fundet nogen juridiske signaler i teksten — indsæt evt. mere af casen, eller gå videre manuelt på fane 2.</p>';
+    list.innerHTML = '<p class="text-gray-500 text-sm">Ingen fund. Indsæt mere tekst, eller gå til beregning.</p>';
     return;
   }
 
@@ -171,7 +181,7 @@ function renderFund() {
     const kort = document.createElement("div");
     kort.className = "card p-3 flex gap-3 items-start";
     kort.innerHTML = `
-      <input type="checkbox" data-fund-id="${escapeHtml(f.id)}" class="fund-checkbox mt-1" ${f.valgt ? "checked" : ""}>
+      <input type="checkbox" data-fund-id="${escapeHtml(f.id)}" aria-label="Godkend ${escapeHtml(f.label)}: ${escapeHtml(f.vaerdi)}" class="fund-checkbox mt-1" ${f.valgt ? "checked" : ""}>
       <div class="flex-1">
         <div class="text-xs text-gray-500">${escapeHtml(f.label)}</div>
         <div class="font-bold text-white">${escapeHtml(f.vaerdi)}</div>
@@ -224,16 +234,14 @@ function renderLovvalg() {
   container.innerHTML = "";
   GRUPPE_RAEKKEFOELGE.forEach(gruppe => {
     if (!grupper[gruppe]) return;
-    const linjer = grupper[gruppe].map(f => `
-      <div class="mt-1 mb-3">
-        <div><strong class="text-white">${escapeHtml(f.vaerdi)}</strong></div>
-        <div class="text-gray-400">${escapeHtml(f.begrundelse)}</div>
-        ${f.citat ? `<div class="text-xs italic text-gray-500">kildecitat: «${escapeHtml(f.citat)}»</div>` : ""}
-      </div>
-    `).join("");
-    const blok = document.createElement("div");
-    blok.innerHTML = `<h3 class="font-semibold text-white mb-1">${escapeHtml(GRUPPE_OVERSKRIFT[gruppe] || gruppe)}</h3>${linjer}`;
-    container.appendChild(blok);
+    grupper[gruppe].forEach(f => {
+      const blok = document.createElement("div");
+      blok.innerHTML = `<h3>${escapeHtml(GRUPPE_OVERSKRIFT[gruppe] || gruppe)}</h3>
+        <strong>${escapeHtml(f.vaerdi)}</strong>
+        <p>${escapeHtml(f.begrundelse)}</p>
+        ${f.citat ? `<p class="text-xs">Fra casen: «${escapeHtml(f.citat)}»</p>` : ""}`;
+      container.appendChild(blok);
+    });
   });
 }
 
@@ -242,12 +250,13 @@ function renderLovvalg() {
 function renderAnsvar() {
   const hovedlov = bestemHovedlov(state.fund);
   const grundlagBox = document.getElementById("ansvarGrundlag");
-  grundlagBox.innerHTML = `<p>${escapeHtml(ANSVARSGRUNDLAG_TEKST[hovedlov] || "Vælg og godkend fund på fane 1 og 2 først.")}</p>`;
+  const koebsret = !ANSVARSGRUNDLAG_TEKST[hovedlov] && state.fund.some(f => f.valgt && f.gruppe === "lovvalg-koeb");
+  grundlagBox.innerHTML = `<p>${escapeHtml(ANSVARSGRUNDLAG_TEKST[hovedlov] || (koebsret ? "Fane 3 bruges kun til transportret (CMR, Søloven, NSAB). Din case er købsret, så her er intet transportansvar at regne." : "Vælg og godkend fund på fane 1 og 2 først."))}</p>`;
 
   renderBeregningForm(hovedlov);
 
   const resultatBox = document.getElementById("beregningResultat");
-  if (state.beregning) {
+  if (state.beregning && !koebsret) {
     renderBeregningResultat(state.beregning);
   } else {
     resultatBox.innerHTML = "";
@@ -263,39 +272,41 @@ function udtraektTal(id) {
 
 function renderBeregningForm(hovedlov) {
   const container = document.getElementById("beregningInput");
+  const koebsret = !ANSVARSGRUNDLAG_TEKST[hovedlov] && state.fund.some(f => f.valgt && f.gruppe === "lovvalg-koeb");
+  container.hidden = koebsret;
   const foreslaaet = !state.beregningInputs ? {
     vaegtKg: udtraektTal("tal-vaegt"),
     antalKolli: udtraektTal("tal-kolli"),
     faktiskTab: udtraektTal("tal-tab")
   } : {};
   const gemte = state.beregningInputs || foreslaaet;
-  const lovValgt = gemte.lov || hovedlov || "SOELOVEN";
+  const lovValgt = koebsret ? "" : (gemte.lov || hovedlov || "");
 
-  const options = LOV_OPTIONS
+  const options = '<option value="">Vælg transportlov</option>' + LOV_OPTIONS
     .map(o => `<option value="${o.value}" ${o.value === lovValgt ? "selected" : ""}>${o.label}</option>`)
     .join("");
 
   const harForslag = foreslaaet.vaegtKg != null || foreslaaet.antalKolli != null || foreslaaet.faktiskTab != null;
   container.innerHTML = `
-    ${harForslag ? '<p class="col-span-2 text-xs text-blue-300">Felter er foreslået ud fra tal fundet i casen (fane 1) — tjek dem, de kan være forkerte.</p>' : ""}
+    ${harForslag ? '<p class="col-span-2 text-xs text-blue-300">Tallene er hentet fra casen. Tjek, at de er rigtige.</p>' : ""}
     <div>
-      <label class="block text-gray-400 mb-1">Lov</label>
+      <label for="inputLov" class="block text-gray-400 mb-1">Lov</label>
       <select id="inputLov" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2">${options}</select>
     </div>
     <div>
-      <label class="block text-gray-400 mb-1">Vægt (kg)</label>
+      <label for="inputVaegt" class="block text-gray-400 mb-1">Vægt (kg)</label>
       <input type="number" id="inputVaegt" min="0" step="any" value="${gemte.vaegtKg != null ? gemte.vaegtKg : ""}" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2">
     </div>
     <div>
-      <label class="block text-gray-400 mb-1">Antal kolli (valgfrit)</label>
+      <label for="inputKolli" class="block text-gray-400 mb-1">Antal kolli (valgfrit)</label>
       <input type="number" id="inputKolli" min="0" step="any" value="${gemte.antalKolli ? gemte.antalKolli : ""}" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2">
     </div>
     <div>
-      <label class="block text-gray-400 mb-1">Faktisk tab (kr.)</label>
+      <label for="inputTab" class="block text-gray-400 mb-1">Faktisk tab (kr.)</label>
       <input type="number" id="inputTab" min="0" step="any" value="${gemte.faktiskTab != null ? gemte.faktiskTab : ""}" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2">
     </div>
     <div class="col-span-2">
-      <label class="block text-gray-400 mb-1">SDR-kurs (kr. pr. SDR)</label>
+      <label for="inputSdrKurs" class="block text-gray-400 mb-1">SDR-kurs (kr. pr. SDR)</label>
       <input type="number" id="inputSdrKurs" min="0" step="any" value="${gemte.sdrKurs != null ? gemte.sdrKurs : SDR_KURS}" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2">
       <p class="text-xs text-gray-500 mt-1">${escapeHtml(SDR_KURS_KILDE)}</p>
     </div>
@@ -309,6 +320,7 @@ function renderBeregningForm(hovedlov) {
 
 function koerBeregning() {
   const lov = document.getElementById("inputLov").value;
+  if (!lov) return;
   const vaegtKg = parseFloat(document.getElementById("inputVaegt").value);
   const antalKolliRaw = document.getElementById("inputKolli").value;
   const antalKolli = antalKolliRaw ? parseFloat(antalKolliRaw) : 0;
@@ -380,7 +392,7 @@ function renderKonklusion() {
     paragrafBox.classList.remove("hidden");
     paragrafListe.innerHTML = resultat.paragraffer.map(p => {
       const opslag = slaaParagrafOp(p);
-      return `<div><strong class="text-white">${escapeHtml(opslag.visning)}</strong>${opslag.forklaring ? " — " + escapeHtml(opslag.forklaring) : ""}</div>`;
+      return `<div><strong class="text-white">${escapeHtml(opslag.visning)}</strong>${opslag.forklaring ? ". " + escapeHtml(opslag.forklaring) : ""}</div>`;
     }).join("");
   } else {
     paragrafBox.classList.add("hidden");
@@ -426,17 +438,89 @@ function wireKonklusion() {
 
 function renderLovopslag() {
   const container = document.getElementById("lovopslagIndhold");
-  container.innerHTML = Object.values(LOVDATA).map(lov => {
-    const linjer = Object.entries(lov.paragraffer)
-      .map(([key, tekst]) => `<div>${escapeHtml(key)}: ${escapeHtml(tekst)}</div>`)
-      .join("");
-    return `
-      <div>
-        <h3 class="font-semibold text-white mb-1">${escapeHtml(lov.navn)}</h3>
-        <div class="space-y-0.5">${linjer}</div>
-      </div>
-    `;
-  }).join("");
+  let filter = document.getElementById("lovFilter");
+  if (!filter) {
+    const label = document.createElement("label"); label.htmlFor = "lovFilter"; label.textContent = "Vis lov";
+    filter = document.createElement("select"); filter.id = "lovFilter";
+    filter.innerHTML = '<option value="">Alle love</option>' + Object.entries(LOVDATA).map(([key, lov]) => `<option value="${escapeHtml(key)}">${escapeHtml(lov.navn)}</option>`).join("");
+    container.before(label, filter); filter.addEventListener("change", renderLovopslag);
+  }
+  container.innerHTML = Object.entries(LOVDATA).filter(([key]) => !filter.value || key === filter.value).flatMap(([, lov]) =>
+    Object.entries(lov.paragraffer).map(([key, tekst]) =>
+      `<div><h3>${escapeHtml(lov.navn)}, ${escapeHtml(key)}</h3><p>${escapeHtml(tekst)}</p></div>`)
+  ).join("");
+}
+
+// Compact pages keep controls visible even when a case has many findings.
+const sideVisninger = [];
+const trin = ["case", "lovvalg", "ansvar", "konklusion"];
+function opdaterTrin() {
+  const index = trin.indexOf(aktivFane);
+  document.getElementById("stepBack").disabled = index === 0;
+  document.getElementById("stepNext").disabled = index === 3 || index === -1;
+  document.getElementById("stepLabel").textContent = index < 0 ? "Lovopslag" : `${index + 1} af 4`;
+}
+function opdaterAlleSider() { sideVisninger.forEach(side => side.refresh()); }
+function wireAppLayout() {
+  document.getElementById("stepBack").addEventListener("click", () => {
+    const index = trin.indexOf(aktivFane);
+    skiftFane(trin[Math.max(0, index - 1)]);
+  });
+  document.getElementById("stepNext").addEventListener("click", () => {
+    skiftFane(trin[Math.min(3, trin.indexOf(aktivFane) + 1)]);
+  });
+  ["checklist", "fundList", "lovvalgSteps", "ansvarGrundlag", "beregningResultat", "konklusionTekst", "tagStillingListe", "paragrafListe", "lovopslagIndhold"].forEach(id => {
+    const content = document.getElementById(id);
+    content.classList.add("paged-content");
+    content.setAttribute("tabindex", "0");
+    const pager = document.createElement("div");
+    pager.className = "pager";
+    const back = document.createElement("button"); back.textContent = "Forrige side";
+    const label = document.createElement("span"); label.setAttribute("aria-live", "polite");
+    const next = document.createElement("button"); next.textContent = id === "fundList" ? "Næste fund" : "Næste side";
+    back.setAttribute("aria-label", `Forrige side i ${content.parentElement.querySelector("h2,h3")?.textContent || "boksen"}`);
+    next.setAttribute("aria-label", `Næste side i ${content.parentElement.querySelector("h2,h3")?.textContent || "boksen"}`);
+    pager.append(back, label, next); content.after(pager);
+    let page = 0;
+    let pages = [];
+    const show = () => {
+      Array.from(content.children).forEach(item => { item.hidden = !pages[page]?.includes(item); });
+      back.disabled = page === 0; next.disabled = page >= pages.length - 1;
+      label.textContent = `${page + 1} af ${Math.max(1, pages.length)}`;
+    };
+    const refresh = () => {
+      if (!content.getClientRects().length) return;
+      const items = Array.from(content.children);
+      const mobile = matchMedia("(max-width: 760px)").matches;
+      items.forEach(item => { item.hidden = false; item.classList.add("page-item"); item.classList.remove("long-text"); });
+      pager.hidden = mobile || !items.length;
+      if (mobile) return;
+      const available = content.clientHeight;
+      if (!available) return;
+      pages = []; let used = 0; let group = [];
+      const columns = id === "lovopslagIndhold" ? 3 : 1;
+      let rowHeight = 0;
+      items.forEach(item => {
+        const height = item.getBoundingClientRect().height + 12;
+        const addition = columns === 1 ? height : Math.max(0, height - rowHeight);
+        if (group.length && used + addition > available) { pages.push(group); group = []; used = 0; rowHeight = 0; }
+        if (height > available && ["lovopslagIndhold", "konklusionTekst"].includes(id)) item.classList.add("long-text");
+        if (columns === 1) used += height;
+        else { used += Math.max(0, height - rowHeight); rowHeight = Math.max(rowHeight, height); }
+        group.push(item);
+        if (columns > 1 && group.length % columns === 0) rowHeight = 0;
+      });
+      if (group.length) pages.push(group);
+      page = Math.min(page, Math.max(0, pages.length - 1)); show();
+    };
+    back.addEventListener("click", () => { page--; show(); content.focus(); });
+    next.addEventListener("click", () => { page++; show(); content.focus(); });
+    new MutationObserver(() => { page = 0; requestAnimationFrame(refresh); }).observe(content, { childList: true });
+    sideVisninger.push({ refresh });
+  });
+  new ResizeObserver(() => requestAnimationFrame(opdaterAlleSider)).observe(document.getElementById("workspace"));
+  document.fonts.ready.then(opdaterAlleSider);
+  opdaterTrin(); requestAnimationFrame(opdaterAlleSider);
 }
 
 // --- J. Initialisering ---
@@ -447,6 +531,7 @@ function initUI() {
   wireFileUpload();
   wireCaseAnalyse();
   wireKonklusion();
+  wireAppLayout();
 }
 
 initUI();

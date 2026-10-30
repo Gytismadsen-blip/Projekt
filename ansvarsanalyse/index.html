@@ -9,58 +9,46 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AnsvarsAnalyse</title>
-<script src="https://cdn.tailwindcss.com"></script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<style>
-  body { background:#0d1117; color:#e6edf3; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-  .card { background:#161b22; border:1px solid #30363d; border-radius:0.75rem; }
-  .tab-btn { color:#8b949e; border-bottom:2px solid transparent; }
-  .tab-btn.active { color:#e6edf3; border-bottom-color:#3b82f6; }
-  .btn-primary { background:#3b82f6; color:white; }
-  .btn-primary:hover { background:#2563eb; }
-  .btn-confirm { background:#10b981; color:white; }
-  .btn-confirm:hover { background:#059669; }
-  .badge-warn { background:#78350f; color:#fcd34d; border:1px solid #92400e; }
-  .badge-ok { background:#064e3b; color:#6ee7b7; border:1px solid #065f46; }
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-thumb { background:#30363d; border-radius:6px; }
-</style>
+<link rel="stylesheet" href="app.css">
 </head>
-<body class="min-h-screen">
+<body class="ansvar-app">
 
 <header class="border-b border-gray-800 px-6 py-4">
-  <h1 class="text-xl font-bold text-white">AnsvarsAnalyse</h1>
-  <p class="text-sm text-gray-400">Transportjura-case → lovvalg, ansvar og erstatning</p>
+  <picture><source srcset="/billeder/ikon_ansvar.webp" type="image/webp"><img class="pf-icon" src="/billeder/ikon_ansvar.png" alt="" width="64" height="64"></picture><div><h1>AnsvarsAnalyse</h1>
+  <p class="text-sm text-gray-400">Find lov, ansvar og erstatning</p></div>
 </header>
 
 <nav class="flex gap-6 px-6 border-b border-gray-800 overflow-x-auto" id="tabbar">
-  <button class="tab-btn active py-3 px-1 whitespace-nowrap" data-tab="case">1. Case &amp; bilag</button>
+  <button class="tab-btn active py-3 px-1 whitespace-nowrap" data-tab="case">1. Case og fund</button>
   <button class="tab-btn py-3 px-1 whitespace-nowrap" data-tab="lovvalg">2. Lovvalg</button>
-  <button class="tab-btn py-3 px-1 whitespace-nowrap" data-tab="ansvar">3. Ansvar &amp; beregning</button>
+  <button class="tab-btn py-3 px-1 whitespace-nowrap" data-tab="ansvar">3. Ansvar og tal</button>
   <button class="tab-btn py-3 px-1 whitespace-nowrap" data-tab="konklusion">4. Konklusion</button>
   <button class="tab-btn py-3 px-1 whitespace-nowrap" data-tab="lovopslag">Lovopslag</button>
 </nav>
 
-<main class="p-6 max-w-4xl mx-auto space-y-6">
+<main id="workspace">
 
   <!-- FANE 1: CASE & BILAG -->
   <section id="tab-case" class="space-y-6">
-    <div class="card p-5">
+    <div class="case-entry"><div class="card p-5">
       <h2 class="font-semibold text-white mb-3">Upload case-dokument</h2>
-      <div id="dropzone" class="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center text-gray-400 cursor-pointer hover:border-blue-500">
+      <div role="button" tabindex="0" aria-label="Vælg casefil" id="dropzone" class="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center text-gray-400 cursor-pointer hover:border-blue-500">
         Træk en fil herind eller klik for at vælge (.docx, .pdf, .txt)
         <input type="file" id="fileInput" accept=".docx,.pdf,.txt" class="hidden">
       </div>
-      <p class="text-xs text-gray-500 mt-2">Der bruges ingen AI og intet forlader din computer — alt sker i browseren.</p>
+      <p class="text-xs text-gray-500 mt-2">Din fil bliver på din computer. Analysen bruger ikke AI.</p>
     </div>
 
     <div class="card p-5">
       <h2 class="font-semibold text-white mb-3">Eller indsæt case-teksten selv</h2>
-      <textarea id="caseText" rows="8" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-3 text-sm" placeholder="Indsæt casens tekst her..."></textarea>
+      <textarea id="caseText" rows="6" aria-label="Casens tekst" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-3 text-sm" placeholder="Indsæt casens tekst her..."></textarea>
       <button id="btnFindValues" class="btn-primary mt-3 px-4 py-2 rounded-lg font-medium">Analysér case</button>
     </div>
 
+    </div>
     <div id="checklistBox" class="card p-5 hidden">
       <h2 class="font-semibold text-white mb-3">Tjekliste</h2>
       <div id="checklist" class="space-y-2 text-sm"></div>
@@ -99,8 +87,8 @@
     <div class="card p-5">
       <h2 class="font-semibold text-white mb-3">Erstatningsberegning</h2>
       <div id="beregningInput" class="grid grid-cols-2 gap-3 text-sm"></div>
-      <div id="beregningResultat" class="mt-4"></div>
     </div>
+    <div class="card p-5"><h2>Resultat</h2><div id="beregningResultat"></div></div>
   </section>
 
   <!-- FANE 4: KONKLUSION -->
@@ -133,6 +121,7 @@
   </section>
 
 </main>
+<footer class="app-footer"><button id="stepBack" type="button">Tilbage</button><span id="stepLabel" aria-live="polite">1 af 4</span><button id="stepNext" class="btn-primary" type="button">Næste trin</button></footer>
 
 <script src="js/lovdata.js"></script>
 <script src="js/parse.js"></script>
