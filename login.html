@@ -55,9 +55,12 @@
     let ready = false;
     const updatePassword = () => {
       const rules = [
+        // Samme krav som Supabase (min. 8 tegn, a-z, A-Z, 0-9 og symbol), ellers afviser serveren koden
         [Array.from(password.value).length >= 8, 'Mindst 8 tegn'],
-        [/\p{Lu}/u.test(password.value), 'Mindst ét stort bogstav'],
-        [/[^\p{L}\p{N}\s]/u.test(password.value), 'Mindst ét specialtegn'],
+        [/[a-z]/.test(password.value), 'Mindst ét lille bogstav (a-z)'],
+        [/[A-Z]/.test(password.value), 'Mindst ét stort bogstav (A-Z)'],
+        [/[0-9]/.test(password.value), 'Mindst ét tal'],
+        [/[!@#$%^&*()_+\-=\[\]{};':"|<>?,.\/`~]/.test(password.value), 'Mindst ét tegn som ! ? # eller @'],
         [!!password.value && password.value === repeat.value, 'Adgangskoderne er ens']
       ];
       checks.replaceChildren(...rules.map(([ok, text]) => {
@@ -77,7 +80,7 @@
       if (code === 'invalid_credentials' || /invalid login/i.test(error?.message || '')) return 'E-mail eller adgangskode er forkert.';
       if (code === 'email_not_confirmed') return 'Bekræft din e-mail via linket i din mail.';
       if (code === 'user_already_exists') return 'Denne e-mail har en konto. Vælg Log ind.';
-      if (code === 'weak_password' || /password.*least/i.test(error?.message || '')) return 'Vælg en stærkere adgangskode med mindst 8 tegn.';
+      if (code === 'weak_password' || /password.*least/i.test(error?.message || '')) return 'Adgangskoden er for svag. Brug mindst 8 tegn med små og store bogstaver, et tal og et tegn som ! eller ?.';
       if (code === 'same_password') return 'Vælg en anden adgangskode end den gamle.';
       if (error?.status === 429 || /rate.limit/i.test(code)) return 'For mange forsøg. Vent lidt og prøv igen.';
       if (error?.status === 422 || code === 'email_address_invalid') return 'Tjek din e-mail og adgangskode.';
@@ -94,7 +97,9 @@
       repeat.hidden = mode !== 'signup'; repeat.required = mode === 'signup';
       document.getElementById('pf-repeat-label').hidden = mode !== 'signup';
       checks.hidden = mode !== 'signup';
-      password.autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
+      // Fortæller browseren om den skal udfylde en gemt kode eller foreslå en ny
+      const autofillHint = { signin: 'current-password', signup: 'new-password', recovery: 'new-password' };
+      password.autocomplete = autofillHint[mode] || autofillHint.signin;
       password.minLength = mode === 'signin' ? 1 : 8;
       submit.textContent = recovery ? 'Gem adgangskode' : mode === 'signup' ? 'Opret konto' : 'Log ind';
       document.getElementById('pf-note').hidden = mode === 'signin';
